@@ -34,9 +34,18 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
+          "image": "./assets/images/enola-headhshot.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
           "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
+            "image": "./assets/images/enola-headhshot.png",
+            "imageWidth": 200,
+            "resizeMode": "contain"
+          },
+          "ios": {
+            "image": "./assets/images/enola-headhshot.png",
+            "imageWidth": 200,
+            "resizeMode": "contain"
           }
         }
       ],
