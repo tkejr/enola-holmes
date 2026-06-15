@@ -1,0 +1,5 @@
+-- Part 2: Enable RLS (Run after Part 1)
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.purchases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.searches ENABLE ROW LEVEL SECURITY;

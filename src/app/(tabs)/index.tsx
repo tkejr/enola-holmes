@@ -1,0 +1,369 @@
+import { router, useFocusEffect } from 'expo-router';
+import { useState, useCallback } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, Alert, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import { supabase } from '@/utils/supabase';
+
+export default function HomeScreen() {
+  const [coins, setCoins] = useState(1);
+  const [loading, setLoading] = useState(false);
+
+  // Reload coins every time the screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadUserCoins();
+    }, [])
+  );
+
+  const loadUserCoins = async () => {
+    try {
+      // Get the current user's session
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        console.log('No session found - using default coins');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('coins')
+        .eq('id', session.user.id)
+        .single();
+
+      if (error) {
+        console.error('Error loading coins:', error);
+      } else if (data) {
+        setCoins(data.coins);
+      }
+    } catch (error) {
+      console.error('Error loading coins:', error);
+    }
+  };
+
+  const deductCoin = async () => {
+    if (coins <= 0) {
+      Alert.alert('Not Enough Coins', 'You need to purchase more coins to perform a search.');
+      router.push('/coins');
+      return false;
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        console.error('No session found');
+        return false;
+      }
+
+      const newBalance = coins - 1;
+      const { error } = await supabase
+        .from('profiles')
+        .update({ coins: newBalance })
+        .eq('id', session.user.id);
+
+      if (!error) {
+        setCoins(newBalance);
+        return true;
+      } else {
+        console.error('Error deducting coin:', error);
+      }
+    } catch (error) {
+      console.error('Error deducting coin:', error);
+    }
+    return false;
+  };
+
+  const pickImageFromGallery = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permissionResult.granted) {
+      Alert.alert('Permission Required', 'Please allow access to your photos to upload an image.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      router.push({
+        pathname: '/scanning',
+        params: { imageUri: result.assets[0].uri },
+      });
+    }
+  };
+
+  const takePhoto = async () => {
+    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!permissionResult.granted) {
+      Alert.alert('Permission Required', 'Please allow access to your camera to take a photo.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      router.push({
+        pathname: '/scanning',
+        params: { imageUri: result.assets[0].uri },
+      });
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.leftIcons}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => {
+              console.log('Settings button pressed');
+              router.push('/settings');
+            }}
+          >
+            <Text style={styles.iconText}>⚙️</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => router.push('/history')}
+          >
+            <Text style={styles.iconText}>🕐</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.logo}>Enola</Text>
+
+        <TouchableOpacity
+          style={styles.coinBadge}
+          onPress={() => router.push('/coins')}
+        >
+          <Text style={styles.coinIcon}>🪙</Text>
+          <Text style={styles.coinText}>{coins}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.content}>
+        <View style={styles.speechBubble}>
+          <Text style={styles.speechText}>
+            Upload their photo,{'\n'}
+            <Text style={styles.speechTextAccent}>I'll do the digging</Text>
+          </Text>
+          <View style={styles.bubbleTail} />
+        </View>
+
+        <View style={styles.characterContainer}>
+          <Image
+            source={require('../../../assets/images/enola-headhshot.png')}
+            style={styles.character}
+            resizeMode="contain"
+          />
+        </View>
+      </View>
+
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.cameraButton}
+          onPress={takePhoto}
+        >
+          <Text style={styles.buttonIcon}>📷</Text>
+          <Text style={styles.cameraButtonText}>Use Camera</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.libraryButton}
+          onPress={pickImageFromGallery}
+        >
+          <Text style={styles.buttonIcon}>🖼️</Text>
+          <Text style={styles.libraryButtonText}>Photo Library</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.trustText}>🔒 Trusted for dating safety</Text>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FAFAFA',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 10,
+  },
+  leftIcons: {
+    gap: 10,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  iconText: {
+    fontSize: 18,
+  },
+  logo: {
+    fontSize: 28,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    letterSpacing: -0.5,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    top: 12,
+    pointerEvents: 'none',
+  },
+  coinBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  coinIcon: {
+    fontSize: 18,
+  },
+  coinText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1C1C1E',
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  speechBubble: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    marginBottom: 20,
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  speechText: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#1C1C1E',
+    textAlign: 'center',
+    lineHeight: 26,
+    letterSpacing: -0.3,
+  },
+  speechTextAccent: {
+    color: '#8E7654',
+    fontWeight: '600',
+  },
+  bubbleTail: {
+    position: 'absolute',
+    bottom: -8,
+    left: '50%',
+    marginLeft: -8,
+    width: 16,
+    height: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 2,
+    transform: [{ rotate: '45deg' }],
+  },
+  characterContainer: {
+    marginTop: 20,
+  },
+  character: {
+    width: 180,
+    height: 180,
+  },
+  footer: {
+    paddingHorizontal: 20,
+    paddingBottom: 34,
+    gap: 12,
+  },
+  cameraButton: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 14,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  cameraButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
+  },
+  libraryButton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  libraryButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    letterSpacing: -0.3,
+  },
+  buttonIcon: {
+    fontSize: 20,
+  },
+  trustText: {
+    fontSize: 13,
+    color: '#8E8E93',
+    textAlign: 'center',
+    marginTop: 12,
+    fontWeight: '400',
+    letterSpacing: -0.2,
+  },
+});

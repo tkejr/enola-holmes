@@ -1,98 +1,154 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+import { hasCompletedOnboarding, resetOnboarding } from '../utils/storage';
+import { supabase } from '../utils/supabase';
 
 export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+  const [isLoading, setIsLoading] = useState(true);
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+  useEffect(() => {
+    checkAuthAndOnboarding();
+  }, []);
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+  const checkAuthAndOnboarding = async () => {
+    try {
+      // First check if user has an active session
+      const { data: { session }, error } = await supabase.auth.getSession();
 
-        {Platform.OS === 'web' && <WebBadge />}
+      if (error) {
+        console.error('Supabase auth error:', error);
+        // Continue without auth
+        setIsLoading(false);
+        return;
+      }
+
+      if (session) {
+        console.log('Active session found, user logged in:', session.user.id);
+        // User has a session, skip to main app
+        router.replace('/(tabs)');
+      } else {
+        // No session, check if they've completed onboarding
+        const completed = await hasCompletedOnboarding();
+        if (completed) {
+          router.replace('/(tabs)');
+        } else {
+          setIsLoading(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking auth:', error);
+      setIsLoading(false);
+    }
+  };
+
+  const handleGetStarted = () => {
+    console.log('Get Started pressed');
+    router.push('/onboarding/find-their');
+  };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.content}>
+          <ActivityIndicator size="large" color="#1C1C1E" />
+        </View>
       </SafeAreaView>
-    </ThemedView>
+    );
+  }
+
+  const handleResetOnboarding = async () => {
+    Alert.alert(
+      'Reset Onboarding',
+      'This will reset your onboarding progress. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            await resetOnboarding();
+            Alert.alert('Success', 'Onboarding reset! Restart the app.');
+          },
+        },
+      ]
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        <TouchableOpacity
+          onLongPress={handleResetOnboarding}
+          delayLongPress={2000}
+        >
+          <Text style={styles.logo}>Enola</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>Welcome to Enola</Text>
+        <Text style={styles.subtitle}>Your personal search assistant</Text>
+
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleGetStarted}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.buttonText}>Get Started</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
+    backgroundColor: '#FAFAFA',
   },
-  safeArea: {
+  content: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  logo: {
+    fontSize: 32,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginBottom: 16,
+    letterSpacing: -0.8,
   },
   title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    marginBottom: 8,
     textAlign: 'center',
+    letterSpacing: -0.6,
   },
-  code: {
-    textTransform: 'uppercase',
+  subtitle: {
+    fontSize: 14,
+    color: '#8E8E93',
+    marginBottom: 32,
+    textAlign: 'center',
+    fontWeight: '400',
+    letterSpacing: -0.2,
   },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+  button: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: -0.3,
   },
 });
