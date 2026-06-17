@@ -5,8 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { uploadAsync } from 'expo-file-system/legacy';
 import { getCoinBalance, recordSearchAndDeductCoin } from '@/utils/searchService';
-import { Canvas, Circle as SkiaCircle, Group } from '@shopify/react-native-skia';
 import { Image } from 'expo-image';
+import { Canvas, Circle as SkiaCircle, Group, useImage, Image as SkiaImage, Line as SkiaLine, Path, Skia } from '@shopify/react-native-skia';
 
 const { width, height } = Dimensions.get('window');
 const FACECHECK_API_TOKEN = 'UFSWdOlDdSa5BCOV6U3OpIi28UIjIO4tkYmOUVYNN4s1h3EQ956npx43IcU6qfdqiNjSPL3gz7Y=';
@@ -27,6 +27,9 @@ export default function ScanningScreen() {
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
   const [imageScale, setImageScale] = useState(1);
+  const [displayImageUri, setDisplayImageUri] = useState(imageUri); // Image with dots drawn on it
+  const [drawProgress, setDrawProgress] = useState(0); // 0 to 1, controls how many dots are shown
+  const skiaImage = useImage(imageUri); // Load image for Skia
   const scanProgress = useRef(new Animated.Value(0)).current;
   const scanProgress2 = useRef(new Animated.Value(0)).current;
   const pointsOpacity = useRef<Animated.Value[]>([]);
@@ -411,28 +414,28 @@ export default function ScanningScreen() {
 
   }, []);
 
-  // Animate facial points when detected
+  // Animate facial points when detected - draw from top to bottom
   useEffect(() => {
     console.log('🎬 Facial points useEffect triggered');
     console.log('📊 facialPoints.length:', facialPoints.length);
-    console.log('📊 pointsOpacity.current.length:', pointsOpacity.current.length);
 
-    if (facialPoints.length > 0 && pointsOpacity.current.length > 0) {
-      console.log('✨ Animating', pointsOpacity.current.length, 'facial points');
-      const pointAnimations = pointsOpacity.current.map((anim, index) =>
-        Animated.spring(anim, {
-          toValue: 1,
-          delay: 600 + index * 100,
-          tension: 80,
-          friction: 8,
-          useNativeDriver: true,
-        })
-      );
+    if (facialPoints.length > 0) {
+      console.log('✨ Starting top-to-bottom draw animation');
+      // Animate from 0 to 1 over 6.5 seconds
+      const startTime = Date.now();
+      const duration = 6500; // 6.5 seconds
 
-      Animated.stagger(100, pointAnimations).start();
-      console.log('✅ Point animations started');
-    } else {
-      console.log('⚠️ Skipping animation - no points or opacity values');
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        setDrawProgress(progress);
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        }
+      };
+
+      requestAnimationFrame(animate);
     }
   }, [facialPoints]);
 
@@ -483,16 +486,10 @@ export default function ScanningScreen() {
   const imageSize = width - 80;
 
   console.log('🎨 Rendering ScanningScreen');
-  console.log('📍 Current facialPoints:', facialPoints);
-  console.log('📊 facialPoints count:', facialPoints.length);
   console.log('📐 imageSize (container):', imageSize);
-  console.log('📐 imageDimensions (actual):', imageDimensions);
+  console.log('📐 imageDimensions:', imageDimensions);
   console.log('📐 imageOffset:', imageOffset);
-  if (facialPoints.length > 0 && imageDimensions.width > 0) {
-    const x = facialPoints[0].x * imageDimensions.width + imageOffset.x;
-    const y = facialPoints[0].y * imageDimensions.height + imageOffset.y;
-    console.log('📍 Point 0 position: x=', x, 'y=', y);
-  }
+  console.log('📐 Skia Image will render at: x=' + imageOffset.x + ', y=' + imageOffset.y + ', w=' + imageDimensions.width + ', h=' + imageDimensions.height);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -519,12 +516,86 @@ export default function ScanningScreen() {
           {/* Image Container */}
           <View style={styles.imageContainer}>
             <View style={styles.imageCard}>
-              {imageUri && (
-                <Image
-                  source={{ uri: imageUri }}
-                  style={styles.image}
-                  resizeMode="contain"
-                />
+              {/* Use Skia Canvas to draw image AND dots together */}
+              {skiaImage && imageDimensions.width > 0 && (
+                <Canvas style={{ width: '100%', height: '100%', backgroundColor: 'black' }}>
+                  <SkiaImage
+                    image={skiaImage}
+                    x={imageOffset.x}
+                    y={imageOffset.y}
+                    width={imageDimensions.width}
+                    height={imageDimensions.height}
+                  />
+                  <Group>
+                    {/* Draw connection lines first (so dots appear on top) */}
+                    {facialPoints.map((point, index) => {
+                      // Only draw if point is within draw progress
+                      if (point.y > drawProgress) return null;
+
+                      const x1 = point.x * imageDimensions.width + imageOffset.x;
+                      const y1 = point.y * imageDimensions.height + imageOffset.y;
+
+                      // Connect to next point of same type
+                      const nextIndex = facialPoints.findIndex((p, i) =>
+                        i > index && p.type === point.type
+                      );
+
+                      if (nextIndex !== -1 && nextIndex === index + 1) {
+                        const nextPoint = facialPoints[nextIndex];
+                        // Only draw line if next point is also visible
+                        if (nextPoint.y > drawProgress) return null;
+
+                        const x2 = nextPoint.x * imageDimensions.width + imageOffset.x;
+                        const y2 = nextPoint.y * imageDimensions.height + imageOffset.y;
+
+                        return (
+                          <SkiaLine
+                            key={`line-${index}`}
+                            p1={{ x: x1, y: y1 }}
+                            p2={{ x: x2, y: y2 }}
+                            color="rgba(14, 165, 233, 0.4)"
+                            strokeWidth={1}
+                          />
+                        );
+                      }
+                      return null;
+                    })}
+
+                    {/* Draw facial points with glow effect */}
+                    {facialPoints.map((point, index) => {
+                      // Only draw if point is within draw progress (top to bottom)
+                      if (point.y > drawProgress) return null;
+
+                      const x = point.x * imageDimensions.width + imageOffset.x;
+                      const y = point.y * imageDimensions.height + imageOffset.y;
+                      return (
+                        <Group key={`dot-${index}`}>
+                          {/* Outer glow */}
+                          <SkiaCircle
+                            cx={x}
+                            cy={y}
+                            r={4}
+                            color="rgba(14, 165, 233, 0.3)"
+                          />
+                          {/* Main dot */}
+                          <SkiaCircle
+                            cx={x}
+                            cy={y}
+                            r={2.5}
+                            color="#0EA5E9"
+                          />
+                          {/* Inner highlight */}
+                          <SkiaCircle
+                            cx={x}
+                            cy={y}
+                            r={1}
+                            color="rgba(255, 255, 255, 0.8)"
+                          />
+                        </Group>
+                      );
+                    })}
+                  </Group>
+                </Canvas>
               )}
 
               {/* Scanning Overlay */}
@@ -540,34 +611,11 @@ export default function ScanningScreen() {
                   ]}
                 />
 
-                {/* Corner Indicators - Now showing facial points! */}
-                {imageDimensions.width > 0 && facialPoints.length >= 4 ? (
-                  <>
-                    <Animated.View style={[styles.facialDot, {
-                      left: facialPoints[0].x * imageDimensions.width + imageOffset.x - 10,
-                      top: facialPoints[0].y * imageDimensions.height + imageOffset.y - 10,
-                    }, { transform: [{ scale: cornerScale }] }]} />
-                    <Animated.View style={[styles.facialDot, {
-                      left: facialPoints[1].x * imageDimensions.width + imageOffset.x - 10,
-                      top: facialPoints[1].y * imageDimensions.height + imageOffset.y - 10,
-                    }, { transform: [{ scale: cornerScale }] }]} />
-                    <Animated.View style={[styles.facialDot, {
-                      left: facialPoints[2].x * imageDimensions.width + imageOffset.x - 10,
-                      top: facialPoints[2].y * imageDimensions.height + imageOffset.y - 10,
-                    }, { transform: [{ scale: cornerScale }] }]} />
-                    <Animated.View style={[styles.facialDot, {
-                      left: facialPoints[3].x * imageDimensions.width + imageOffset.x - 10,
-                      top: facialPoints[3].y * imageDimensions.height + imageOffset.y - 10,
-                    }, { transform: [{ scale: cornerScale }] }]} />
-                  </>
-                ) : (
-                  <>
-                    <Animated.View style={[styles.cornerTL, { transform: [{ scale: cornerScale }] }]} />
-                    <Animated.View style={[styles.cornerTR, { transform: [{ scale: cornerScale }] }]} />
-                    <Animated.View style={[styles.cornerBL, { transform: [{ scale: cornerScale }] }]} />
-                    <Animated.View style={[styles.cornerBR, { transform: [{ scale: cornerScale }] }]} />
-                  </>
-                )}
+                {/* Corner Indicators */}
+                <Animated.View style={[styles.cornerTL, { transform: [{ scale: cornerScale }] }]} />
+                <Animated.View style={[styles.cornerTR, { transform: [{ scale: cornerScale }] }]} />
+                <Animated.View style={[styles.cornerBL, { transform: [{ scale: cornerScale }] }]} />
+                <Animated.View style={[styles.cornerBR, { transform: [{ scale: cornerScale }] }]} />
 
                 {/* Primary Scan Line */}
                 <Animated.View
@@ -611,24 +659,6 @@ export default function ScanningScreen() {
               <Animated.View style={[styles.imageGlow, { opacity: glowOpacity }]} />
             </View>
           </View>
-
-          {/* DEBUG: Show facial points data */}
-          {facialPoints.length > 0 && (
-            <View style={{ backgroundColor: 'rgba(255,0,0,0.9)', padding: 10, marginBottom: 10 }}>
-              <Text style={{ color: 'white', fontSize: 10 }}>
-                ✅ Facial points detected: {facialPoints.length} points
-              </Text>
-              <Text style={{ color: 'white', fontSize: 10 }}>
-                First point: x={facialPoints[0].x.toFixed(3)}, y={facialPoints[0].y.toFixed(3)}
-              </Text>
-              <Text style={{ color: 'white', fontSize: 10 }}>
-                Image dims: {imageDimensions.width.toFixed(0)} x {imageDimensions.height.toFixed(0)}
-              </Text>
-              <Text style={{ color: 'white', fontSize: 10 }}>
-                Offset: x={imageOffset.x.toFixed(0)}, y={imageOffset.y.toFixed(0)}
-              </Text>
-            </View>
-          )}
 
           {/* Progress Section */}
           <View style={styles.progressSection}>
@@ -731,8 +761,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     alignItems: 'center',
     marginBottom: 28,
-    width: width - 80,
-    height: width - 80,
+    alignSelf: 'center',
   },
   imageCard: {
     width: width - 80,
@@ -806,12 +835,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 16,
     left: 16,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'red',
-    borderWidth: 3,
-    borderColor: 'yellow',
+    width: 24,
+    height: 24,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderColor: '#0EA5E9',
+    borderBottomLeftRadius: 4,
   },
   cornerBR: {
     position: 'absolute',

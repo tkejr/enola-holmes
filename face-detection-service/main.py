@@ -34,16 +34,16 @@ FACE_OUTLINE_INDICES = [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 28
 LEFT_EYEBROW_INDICES = [70, 63, 105, 66, 107]
 RIGHT_EYEBROW_INDICES = [336, 296, 334, 293, 300]
 
-LEFT_EYE_INDICES = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]
-RIGHT_EYE_INDICES = [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398]
+LEFT_EYE_INDICES = [33, 133, 157, 158, 159, 145]  # Just 6 key points around eye
+RIGHT_EYE_INDICES = [362, 263, 387, 386, 385, 374]  # Just 6 key points around eye
 
-NOSE_BRIDGE_INDICES = [168, 6, 197, 195]
-NOSE_TIP_INDICES = [1, 2, 98, 327]
-NOSE_BASE_INDICES = [129, 203, 49, 131, 134, 51, 5, 281, 363, 360, 279]
+NOSE_BRIDGE_INDICES = [168, 6]  # Just top and center of bridge
+NOSE_TIP_INDICES = [1, 2]  # Just tip center
+NOSE_BASE_INDICES = [49, 5, 279]  # Just left, center, right of base
 
-UPPER_LIP_INDICES = [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291]
-LOWER_LIP_INDICES = [146, 91, 181, 84, 17, 314, 405, 321, 375, 291]
-MOUTH_INNER_INDICES = [78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308]
+UPPER_LIP_INDICES = [61, 37, 0, 267, 291]  # Key points only
+LOWER_LIP_INDICES = [146, 84, 17, 314, 375]  # Key points only
+MOUTH_INNER_INDICES = []  # Remove inner mouth entirely
 
 
 def normalize_landmarks(landmarks, image_width: int, image_height: int) -> List[Dict]:
