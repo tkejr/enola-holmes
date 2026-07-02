@@ -23,6 +23,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "tanmay.kejriwal@tcu.edu",
+        "ascAppId": "6781339006",
+        "appleTeamId": "25HCJ3H89K"
+      }
+    }
   }
 }

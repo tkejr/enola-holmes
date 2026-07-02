@@ -1,0 +1,24 @@
+name: Publish iOS to App Store
+
+# Triggers a production build + App Store submission on every push to main.
+# Runs entirely on EAS infra — no external secrets/tokens needed.
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build iOS (production)
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  submit:
+    name: Submit to App Store
+    needs: [build]
+    type: submit
+    params:
+      platform: ios
+      profile: production
+      build_id: ${{ needs.build.outputs.build_id }}
