@@ -22,6 +22,9 @@ export default function PaywallScreen() {
   // Blank backdrop until the offering loads so the template has packages to draw.
   if (!offering) return <View style={{ flex: 1, backgroundColor: '#FAFAFA' }} />;
 
+  // The RC-hosted template already renders Restore Purchases + Terms/Privacy + the
+  // auto-renew disclosure (Guideline 3.1.2), so we don't stack our own on top — doing
+  // so overlapped the template's own footer. Configure those links in the RC dashboard.
   return (
     <RevenueCatUI.Paywall
       style={{ flex: 1 }}

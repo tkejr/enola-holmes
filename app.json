@@ -12,7 +12,8 @@
       "bundleIdentifier": "com.tkejriwal.EnolaNew",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "appleTeamId": "25HCJ3H89K"
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +23,12 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "permissions": [],
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ],
       "package": "com.tkejriwal.EnolaNew"
     },
     "web": {

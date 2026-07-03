@@ -28,18 +28,24 @@ const MASCOT = 260;
 const SRC = 1106;
 const S = MASCOT / SRC; // source px -> display px
 // Where the vector lens should rest, and the grip column it must line up with (source px).
-const LENS_CX = 638 * S; // same column as her fist/handle
-const LENS_CY = 258 * S; // above the fist so the lens sits over the raised hand
+const LENS_CX = 634 * S; // centered on the dark handle-stub she actually grips (src x~628-644)
+const LENS_CY = 250 * S; // lens rests above the raised hand; handle runs down through her fist
 const LENS_R = 40 * S;   // natural glass size relative to the mascot
-// MagnifyingGlass viewBox is 100x260: lens center (50,50) r32, handle vertical on x=50.
+// MagnifyingGlass viewBox is 100x195: lens center (50,50) r32, handle vertical on x=50.
 // Scale so the SVG lens radius (32/100 of width) equals LENS_R, then align lens center.
 const GLASS_W = LENS_R / 0.32;
-const GLASS_H = GLASS_W * 2.6;
+const GLASS_H = GLASS_W * 1.95;
 const GLASS_LEFT = LENS_CX - 0.50 * GLASS_W;        // SVG lens/handle at x=50 (0.50 of width)
-const GLASS_TOP = LENS_CY - (50 / 260) * GLASS_H;   // SVG lens center at y=50 of 260
+const GLASS_TOP = LENS_CY - (50 / 195) * GLASS_H;   // SVG lens center at y=50 of 195
 // At t=0 the glass is lifted up and slightly out, then eases down into her fist.
 const GLASS_FLY_X = 10;
 const GLASS_FLY_Y = -40;
+// Bounding box of her raised fist in source px, used to re-draw just the fist on top of the
+// settled handle so her fingers occlude it. Measured from enola-nolens.png.
+const FIST_X = 600 * S;
+const FIST_Y = 352 * S;
+const FIST_W = 58 * S;
+const FIST_H = 62 * S;
 
 export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
@@ -179,6 +185,16 @@ export default function HomeScreen() {
             ]}
           >
             <MagnifyingGlass size={GLASS_W} />
+          </Animated.View>
+          {/* Her fist, drawn again ON TOP of the settled glass so her fingers occlude the
+              handle passing through them — the grip looks continuous, not cut off. Fades in
+              only once the glass has landed, so it never covers the big flying glass. */}
+          <Animated.View style={[styles.handClip, { opacity: glass }]} pointerEvents="none">
+            <Image
+              source={require('../../assets/images/enola-nolens.png')}
+              resizeMode="contain"
+              style={styles.handImage}
+            />
           </Animated.View>
         </View>
 
@@ -327,6 +343,22 @@ const styles = StyleSheet.create({
     top: GLASS_TOP,
     width: GLASS_W,
     height: GLASS_H,
+  },
+  // A window over just her fist; the mascot inside is offset so only the fist shows through.
+  handClip: {
+    position: 'absolute',
+    left: FIST_X,
+    top: FIST_Y,
+    width: FIST_W,
+    height: FIST_H,
+    overflow: 'hidden',
+  },
+  handImage: {
+    position: 'absolute',
+    left: -FIST_X,
+    top: -FIST_Y,
+    width: MASCOT,
+    height: MASCOT,
   },
   logo: {
     fontSize: 32,

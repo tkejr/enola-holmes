@@ -1,6 +1,9 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useState, useCallback } from 'react';
-import { StyleSheet, View, Text, Alert, Image, Linking } from 'react-native';
+import { StyleSheet, View, Text, Alert, Linking } from 'react-native';
+// expo-image decodes the large (1.8MB) headshot PNG reliably on device; RN's Image
+// rendered it in the simulator but left it blank on physical devices.
+import { Image } from 'expo-image';
 import { HapticTouchable } from '@/components/haptic-touchable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -144,7 +147,7 @@ export default function HomeScreen() {
           <Image
             source={require('../../../assets/images/enola-headhshot.png')}
             style={styles.character}
-            resizeMode="contain"
+            contentFit="contain"
           />
         </View>
       </View>

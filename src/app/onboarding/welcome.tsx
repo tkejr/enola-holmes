@@ -7,7 +7,6 @@ import { setOnboardingCompleted } from '../../utils/storage';
 import { onboardingAnswers } from '../../utils/onboardingAnswers';
 import { supabase } from '../../utils/supabase';
 import { identifyUser } from '../../utils/revenuecat';
-import Purchases from 'react-native-purchases';
 import { StaggerIn } from '../../components/stagger-in';
 import { Pagination } from '../../components/pagination';
 import { useState, useMemo, useEffect } from 'react';
@@ -150,17 +149,6 @@ export default function WelcomeScreen() {
 
       console.log('User account created:', userId);
 
-      // Read RevenueCat's anonymous device id BEFORE identifyUser() overwrites it
-      // with the Supabase uuid. This id lives in the keychain and survives an
-      // app reinstall, so the RPC uses it to grant the free coin only once per
-      // device. Best-effort: if it fails we just skip the guard for this signup.
-      let deviceId: string | null = null;
-      try {
-        deviceId = await Purchases.getAppUserID();
-      } catch (e) {
-        console.warn('Could not read RevenueCat device id:', e);
-      }
-
       // Tie RevenueCat to this Supabase user BEFORE they can reach the paywall/coin store.
       // Without this, a first purchase is attributed to RC's anonymous id and the webhook
       // can't map it to this profile — coins would be credited to nobody.
@@ -171,8 +159,7 @@ export default function WelcomeScreen() {
         .rpc('create_user_profile', {
           user_id: userId,
           user_email: tempEmail,
-          referral_code_used: code || null,
-          device_id: deviceId
+          referral_code_used: code || null
         });
 
       if (profileError) {

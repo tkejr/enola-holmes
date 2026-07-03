@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 40,
     paddingTop: 40,
-    paddingBottom: 20,
+    paddingBottom: 160, // clear the absolute footer (pagination + Continue + Skip)
   },
   title: {
     fontSize: 26,

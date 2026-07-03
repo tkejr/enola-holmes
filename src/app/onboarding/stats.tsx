@@ -1,6 +1,6 @@
 import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View, Text, ScrollView } from 'react-native';
 import { HapticTouchable } from '@/components/haptic-touchable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StaggerIn } from '../../components/stagger-in';
@@ -16,7 +16,11 @@ export default function StatsScreen() {
         <Text style={styles.logo}>Enola</Text>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <StaggerIn>
         <View style={styles.iconsRow}>
           <Ionicons name="heart-outline" size={38} color="#1C1C1E" />
@@ -50,7 +54,7 @@ export default function StatsScreen() {
           <Text style={styles.statSource}>~ Social Catfish Survey</Text>
         </View>
         </StaggerIn>
-      </View>
+      </ScrollView>
 
       <View style={styles.footer}>
         <Pagination step={1} />
@@ -90,8 +94,10 @@ const styles = StyleSheet.create({
     right: 20,
     fontSize: 20,
   },
-  content: {
+  scroll: {
     flex: 1,
+  },
+  content: {
     paddingHorizontal: 40,
     paddingTop: 20,
     paddingBottom: 140, // clear the absolute footer (pagination + button)

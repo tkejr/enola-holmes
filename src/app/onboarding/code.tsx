@@ -1,10 +1,11 @@
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View, Text, TextInput, ActivityIndicator } from 'react-native';
+import { Pressable, StyleSheet, View, Text, TextInput, ActivityIndicator, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import { HapticTouchable } from '@/components/haptic-touchable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { StaggerIn } from '../../components/stagger-in';
 import { Pagination } from '../../components/pagination';
@@ -59,6 +60,19 @@ export default function CodeScreen() {
   // paste, autofill and backspace all "just work" — we only sanitize + cap the value.
   const boxes = Array.from({ length: CODE_LENGTH }, (_, i) => code[i] ?? '');
 
+  // Normalize any string (typed or pasted) to the code alphabet + length.
+  const sanitize = (t: string) => t.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LENGTH);
+
+  // Long-press the boxes to paste — the invisible input suppresses the native paste
+  // callout, so we offer it explicitly by reading the clipboard ourselves.
+  const onPaste = async () => {
+    const clip = sanitize(await Clipboard.getStringAsync());
+    if (!clip) return;
+    setErrorMsg(null);
+    setCode(clip);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  };
+
   // A box rolled a new character in — play the counter tick + a light haptic. Called
   // once per newly-filled box, so a paste ticks rapidly across all filled boxes.
   const onRoll = () => {
@@ -76,6 +90,10 @@ export default function CodeScreen() {
         <Text style={styles.logo}>Enola</Text>
       </View>
 
+      {/* No KeyboardAvoidingView: lifting the footer made Redeem/Skip overlap the code
+          boxes. Instead the footer is hidden while typing and a down-chevron closes the
+          keyboard. Tapping the background also dismisses it. */}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <StaggerIn style={styles.content}>
         <View style={styles.giftIcon}>
           <Ionicons name="gift-outline" size={90} color="#1C1C1E" />
@@ -83,8 +101,14 @@ export default function CodeScreen() {
 
         <Text style={styles.title}>Got a Code?</Text>
         <Text style={styles.subtitle}>Redeem it for a free search</Text>
+        <Text style={styles.pasteHint}>Tip: press and hold the boxes to paste</Text>
 
-        <Pressable style={styles.boxesRow} onPress={() => inputRef.current?.focus()}>
+        <Pressable
+          style={styles.boxesRow}
+          onPress={() => inputRef.current?.focus()}
+          onLongPress={onPaste}
+          delayLongPress={350}
+        >
           {boxes.map((char, i) => {
             // The "active" box is the first empty slot (or the last one when full).
             const isActive = focused && (i === code.length || (code.length === CODE_LENGTH && i === CODE_LENGTH - 1));
@@ -106,7 +130,7 @@ export default function CodeScreen() {
             ref={inputRef}
             style={styles.hiddenInput}
             value={code}
-            onChangeText={(t) => { setErrorMsg(null); setCode(t.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LENGTH)); }}
+            onChangeText={(t) => { setErrorMsg(null); setCode(sanitize(t)); }}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             maxLength={CODE_LENGTH}
@@ -119,27 +143,39 @@ export default function CodeScreen() {
         </Pressable>
 
         {errorMsg && <Text style={styles.errorText}>{errorMsg}</Text>}
+
+        {focused && (
+          <HapticTouchable style={styles.dismissButton} onPress={Keyboard.dismiss}>
+            <Ionicons name="chevron-down" size={22} color="#1C1C1E" />
+            <Text style={styles.dismissText}>Close keyboard</Text>
+          </HapticTouchable>
+        )}
       </StaggerIn>
+      </TouchableWithoutFeedback>
 
-      <View style={styles.footer}>
-        <Pagination step={6} />
+      {/* Hidden while typing so Redeem/Skip never overlap the code boxes. Close the
+          keyboard (chevron above, or tap the background) to bring them back. */}
+      {!focused && (
+        <View style={styles.footer}>
+          <Pagination step={6} />
 
-        <HapticTouchable
-          style={[styles.button, (code.length !== CODE_LENGTH || checking) && styles.buttonDisabled]}
-          onPress={onRedeem}
-          disabled={code.length !== CODE_LENGTH || checking}
-        >
-          {checking ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.buttonText}>Redeem</Text>
-          )}
-        </HapticTouchable>
+          <HapticTouchable
+            style={[styles.button, (code.length !== CODE_LENGTH || checking) && styles.buttonDisabled]}
+            onPress={onRedeem}
+            disabled={code.length !== CODE_LENGTH || checking}
+          >
+            {checking ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.buttonText}>Redeem</Text>
+            )}
+          </HapticTouchable>
 
-        <HapticTouchable onPress={() => router.push('/paywall')}>
-          <Text style={styles.skipText}>Skip</Text>
-        </HapticTouchable>
-      </View>
+          <HapticTouchable onPress={() => router.push('/paywall')}>
+            <Text style={styles.skipText}>Skip</Text>
+          </HapticTouchable>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -196,15 +232,38 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 17,
     color: '#8E8E93',
-    marginBottom: 36,
+    marginBottom: 8,
     fontWeight: '400',
     letterSpacing: -0.4,
+  },
+  pasteHint: {
+    fontSize: 13,
+    color: '#B0B0B5',
+    marginBottom: 32,
+    fontWeight: '400',
+    letterSpacing: -0.2,
   },
   boxesRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
     gap: 8,
+  },
+  dismissButton: {
+    marginTop: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    backgroundColor: '#F0F0F0',
+  },
+  dismissText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    letterSpacing: -0.2,
   },
   errorText: {
     color: '#FF3B30',
@@ -224,12 +283,9 @@ const styles = StyleSheet.create({
     // Absolute fill gives the invisible input the full row's hit area so taps focus it.
   },
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     paddingHorizontal: 40,
     paddingBottom: 40,
+    paddingTop: 12,
     backgroundColor: '#FAFAFA',
   },
   button: {

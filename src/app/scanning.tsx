@@ -20,7 +20,6 @@ export default function ScanningScreen() {
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
   const [imageScale, setImageScale] = useState(1);
   const [displayImageUri, setDisplayImageUri] = useState(imageUri); // Image with dots drawn on it
-  const [drawProgress, setDrawProgress] = useState(0); // 0 to 1, controls how many dots are shown
   const skiaImage = useImage(imageUri); // Load image for Skia
   const scanProgress = useRef(new Animated.Value(0)).current;
   const scanProgress2 = useRef(new Animated.Value(0)).current;
@@ -33,17 +32,34 @@ export default function ScanningScreen() {
   // Cosmetic scanning overlay: draws a grid of facial-landmark dots over the photo while
   // the real search runs server-side. These are decorative reference points, not a face
   // detector — the actual matching happens in the face-search Edge Function.
-  const showScanningOverlay = () => {
-    const points = [
-      { x: 0.35, y: 0.3, type: 'eye' },
-      { x: 0.65, y: 0.3, type: 'eye' },
-      { x: 0.5, y: 0.45, type: 'nose' },
-      { x: 0.41, y: 0.58, type: 'mouth' },
-      { x: 0.59, y: 0.58, type: 'mouth' },
-      { x: 0.5, y: 0.62, type: 'mouth' },
-      { x: 0.32, y: 0.25, type: 'eyebrow' },
-      { x: 0.68, y: 0.25, type: 'eyebrow' },
-    ];
+  const FALLBACK_POINTS = [
+    { x: 0.35, y: 0.3, type: 'eye' },
+    { x: 0.65, y: 0.3, type: 'eye' },
+    { x: 0.5, y: 0.45, type: 'nose' },
+    { x: 0.41, y: 0.58, type: 'mouth' },
+    { x: 0.59, y: 0.58, type: 'mouth' },
+    { x: 0.5, y: 0.62, type: 'mouth' },
+    { x: 0.32, y: 0.25, type: 'eyebrow' },
+    { x: 0.68, y: 0.25, type: 'eyebrow' },
+  ];
+
+  const showScanningOverlay = async () => {
+    let points = FALLBACK_POINTS;
+    const baseUrl = process.env.EXPO_PUBLIC_FACE_DETECT_URL;
+    if (baseUrl) {
+      try {
+        const form = new FormData();
+        // RN FormData takes a file-descriptor object for the local image uri.
+        form.append('file', { uri: imageUri, name: 'photo.jpg', type: 'image/jpeg' } as any);
+        const res = await fetch(`${baseUrl}/detect-face`, { method: 'POST', body: form });
+        const data = await res.json();
+        if (data?.faceDetected && Array.isArray(data.facialPoints) && data.facialPoints.length > 0) {
+          points = data.facialPoints;
+        }
+      } catch (e) {
+        console.warn('Face-detect service failed, using fallback dots:', e);
+      }
+    }
     setFacialPoints(points);
     pointsOpacity.current = points.map(() => new Animated.Value(0));
   };
@@ -264,31 +280,6 @@ export default function ScanningScreen() {
 
   }, []);
 
-  // Animate facial points when detected - draw from top to bottom
-  useEffect(() => {
-    console.log('🎬 Facial points useEffect triggered');
-    console.log('📊 facialPoints.length:', facialPoints.length);
-
-    if (facialPoints.length > 0) {
-      console.log('✨ Starting top-to-bottom draw animation');
-      // Animate from 0 to 1 over 6.5 seconds
-      const startTime = Date.now();
-      const duration = 6500; // 6.5 seconds
-
-      const animate = () => {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        setDrawProgress(progress);
-
-        if (progress < 1) {
-          requestAnimationFrame(animate);
-        }
-      };
-
-      requestAnimationFrame(animate);
-    }
-  }, [facialPoints]);
-
   // Animate progress bar when actualProgress changes
   useEffect(() => {
     Animated.timing(progressValue, {
@@ -379,9 +370,6 @@ export default function ScanningScreen() {
                   <Group>
                     {/* Draw connection lines first (so dots appear on top) */}
                     {facialPoints.map((point, index) => {
-                      // Only draw if point is within draw progress
-                      if (point.y > drawProgress) return null;
-
                       const x1 = point.x * imageDimensions.width + imageOffset.x;
                       const y1 = point.y * imageDimensions.height + imageOffset.y;
 
@@ -392,9 +380,6 @@ export default function ScanningScreen() {
 
                       if (nextIndex !== -1 && nextIndex === index + 1) {
                         const nextPoint = facialPoints[nextIndex];
-                        // Only draw line if next point is also visible
-                        if (nextPoint.y > drawProgress) return null;
-
                         const x2 = nextPoint.x * imageDimensions.width + imageOffset.x;
                         const y2 = nextPoint.y * imageDimensions.height + imageOffset.y;
 
@@ -413,9 +398,6 @@ export default function ScanningScreen() {
 
                     {/* Draw facial points with glow effect */}
                     {facialPoints.map((point, index) => {
-                      // Only draw if point is within draw progress (top to bottom)
-                      if (point.y > drawProgress) return null;
-
                       const x = point.x * imageDimensions.width + imageOffset.x;
                       const y = point.y * imageDimensions.height + imageOffset.y;
                       return (
