@@ -5,7 +5,6 @@ import { StyleSheet, View, Text, ActivityIndicator, Alert, Animated, Easing, Ima
 import { HapticTouchable } from '@/components/haptic-touchable';
 import Reanimated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MagnifyingGlass } from '../components/magnifying-glass';
 import { OnlyFansIcon } from '../components/onlyfans-icon';
 import { hasCompletedOnboarding, resetOnboarding } from '../utils/storage';
 import { supabase } from '../utils/supabase';
@@ -20,32 +19,22 @@ const findItems = [
 ];
 const ITEM_STAGGER = 400; // ms between each band appearing
 
-// Mascot + glass geometry, measured from the 1106px source `enola-nolens.png`, in which
-// Enola's raised fist grips a short VERTICAL handle stub with no lens (grip column x~638,
-// handle visible y~353..405 px). The hand-free vector glass supplies lens + full handle;
-// we sink its handle into that same fist so HER fingers wrap it, lens resting above.
+// Mascot + glass geometry. `enola-glass-full.png` (87x190) is a pixel crop of
+// `enola-body.png` at source (619, 207) with the finger-covered part of the bar synthesized,
+// so the flying glass has a complete bar and no severed fingertips. Her hand in
+// `enola-nolens.png` is untouched original art (closed fist, knuckles top at source y~333).
+// A clip window ending at that knuckle line makes the bar visibly sink INTO the fist as the
+// glass descends; once settled we swap the base to `enola-body.png` — fingers wrap the bar,
+// and the final frame is untouched original art.
 const MASCOT_BASE = 260; // reference size; the real MASCOT scales to screen width at runtime
 const SRC = 1106;
 const S = MASCOT_BASE / SRC; // source px -> display px (at base size; multiply by `k` for actual)
-// Where the vector lens should rest, and the grip column it must line up with (source px).
-const LENS_CX = 634 * S; // centered on the dark handle-stub she actually grips (src x~628-644)
-const LENS_CY = 250 * S; // lens rests above the raised hand; handle runs down through her fist
-const LENS_R = 40 * S;   // natural glass size relative to the mascot
-// MagnifyingGlass viewBox is 100x195: lens center (50,50) r32, handle vertical on x=50.
-// Scale so the SVG lens radius (32/100 of width) equals LENS_R, then align lens center.
-const GLASS_W = LENS_R / 0.32;
-const GLASS_H = GLASS_W * 1.95;
-const GLASS_LEFT = LENS_CX - 0.50 * GLASS_W;        // SVG lens/handle at x=50 (0.50 of width)
-const GLASS_TOP = LENS_CY - (50 / 195) * GLASS_H;   // SVG lens center at y=50 of 195
-// At t=0 the glass is lifted up and slightly out, then eases down into her fist.
-const GLASS_FLY_X = 10;
-const GLASS_FLY_Y = -40;
-// Bounding box of her raised fist in source px, used to re-draw just the fist on top of the
-// settled handle so her fingers occlude it. Measured from enola-nolens.png.
-const FIST_X = 600 * S;
-const FIST_Y = 352 * S;
-const FIST_W = 58 * S;
-const FIST_H = 62 * S;
+const GLASS_X = 619 * S;
+const GLASS_Y = 207 * S;
+const GLASS_W = 87 * S;
+const GLASS_H = 190 * S;
+const HAND_TOP = 307 * S; // fingertip line: the flying glass is clipped below it (submerge)
+const FLY_SPACE = 130;    // base px of headroom above the mascot box for the airborne glass
 
 export default function HomeScreen() {
   const { width, height } = useWindowDimensions();
@@ -64,27 +53,31 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   // 'landing' -> 'find' -> 'photo' -> navigate to onboarding. The mascot never moves.
   const [phase, setPhase] = useState<'landing' | 'find' | 'photo'>('landing');
-  // Magnifying glass zooms out from big-and-centered into its resting place above the title.
+  // Magnifying glass swoops from big-and-overhead down into her hand; once settled we swap
+  // to the original one-piece artwork.
+  const [landed, setLanded] = useState(false);
   const glass = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     checkAuthAndOnboarding();
   }, []);
 
-  // Once the landing shows: hold the big magnifying glass over the whole page for half a
-  // second, then smoothly zoom it out until it submerges into Enola's (empty) hand.
+  // Once the landing shows: hold the big magnifying glass overhead for half a second, then
+  // swoop it down into Enola's empty hand. Easing.back overshoots at the end — the glass
+  // sinks a touch into her grip and settles back, like the hand catching it — and finishes
+  // at an exact moment, so the swap to the one-piece artwork is seamless.
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || landed) return;
     glass.setValue(0);
     Animated.sequence([
       Animated.delay(500),
       Animated.timing(glass, {
         toValue: 1,
         duration: 1100,
-        easing: Easing.out(Easing.cubic),
+        easing: Easing.out(Easing.back(1.4)),
         useNativeDriver: true,
       }),
-    ]).start();
+    ]).start(({ finished }) => finished && setLanded(true));
   }, [isLoading]);
 
   const checkAuthAndOnboarding = async () => {
@@ -174,51 +167,61 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={[styles.mascotBox, { width: MASCOT, height: MASCOT }]}>
-          {/* The mascot with an EMPTY hand — no glass in it while the animation plays,
-              so there's never a double glass. The flying vector glass below becomes the
-              one she holds once it settles. */}
+          {/* Empty-handed mascot while the glass is airborne; the untouched original artwork
+              (glass in hand, fingers wrapping the handle) once it lands. */}
           <Image
-            source={require('../../assets/images/enola-nolens.png')}
+            source={
+              landed
+                ? require('../../assets/images/enola-body.png')
+                : require('../../assets/images/enola-nolens.png')
+            }
             resizeMode="contain"
             style={[styles.mascot, { width: MASCOT, height: MASCOT }]}
           />
-          {/* A hand-free glass: lens + full handle only. Starts lifted & a bit bigger, then
-              eases down until its full handle sinks into her fist and stays gripped. */}
-          <Animated.View
-            style={[
-              styles.glass,
-              {
-                left: GLASS_LEFT * k,
-                top: GLASS_TOP * k,
-                width: GLASS_W * k,
-                height: GLASS_H * k,
-                transform: [
-                  { translateX: glass.interpolate({ inputRange: [0, 1], outputRange: [GLASS_FLY_X * k, 0] }) },
-                  { translateY: glass.interpolate({ inputRange: [0, 1], outputRange: [GLASS_FLY_Y * k, 0] }) },
-                  { scale: glass.interpolate({ inputRange: [0, 1], outputRange: [2.2, 1] }) },
-                  { rotate: glass.interpolate({ inputRange: [0, 1], outputRange: ['-8deg', '0deg'] }) },
-                ],
-              },
-            ]}
-          >
-            <MagnifyingGlass size={GLASS_W * k} />
-          </Animated.View>
-          {/* Her fist, drawn again ON TOP of the settled glass so her fingers occlude the
-              handle passing through them — the grip looks continuous, not cut off. Fades in
-              only once the glass has landed, so it never covers the big flying glass. */}
-          <Animated.View
-            style={[
-              styles.handClip,
-              { left: FIST_X * k, top: FIST_Y * k, width: FIST_W * k, height: FIST_H * k, opacity: glass },
-            ]}
-            pointerEvents="none"
-          >
-            <Image
-              source={require('../../assets/images/enola-nolens.png')}
-              resizeMode="contain"
-              style={[styles.handImage, { left: -FIST_X * k, top: -FIST_Y * k, width: MASCOT, height: MASCOT }]}
-            />
-          </Animated.View>
+          {/* The real art glass with a full bar, flying into her hand. The window around it
+              ends at her knuckle line, so as the glass descends the bar visibly submerges
+              into her fist; her fingers wrap it via the enola-body swap once it settles. */}
+          {!landed && (
+            <View
+              style={{
+                position: 'absolute',
+                left: 0,
+                top: -FLY_SPACE * k,
+                width: MASCOT,
+                height: (FLY_SPACE + HAND_TOP) * k,
+                overflow: 'hidden',
+              }}
+              pointerEvents="none"
+            >
+              <Animated.View
+                style={[
+                  styles.glass,
+                  {
+                    left: GLASS_X * k,
+                    top: (FLY_SPACE + GLASS_Y) * k,
+                    width: GLASS_W * k,
+                    height: GLASS_H * k,
+                    transform: [
+                      // Position clamps at the resting point: Easing.back overshoots past 1,
+                      // and unclamped translateY would sink the round lens below the HAND_TOP
+                      // clip line and flat-cut it. The settle wobble lives on scale/rotate,
+                      // which never cross the clip.
+                      { translateX: glass.interpolate({ inputRange: [0, 1], outputRange: [-26 * k, 0], extrapolate: 'clamp' }) },
+                      { translateY: glass.interpolate({ inputRange: [0, 1], outputRange: [-110 * k, 0], extrapolate: 'clamp' }) },
+                      { scale: glass.interpolate({ inputRange: [0, 1], outputRange: [2.6, 1] }) },
+                      { rotate: glass.interpolate({ inputRange: [0, 1], outputRange: ['-22deg', '0deg'] }) },
+                    ],
+                  },
+                ]}
+              >
+                <Image
+                  source={require('../../assets/images/enola-glass-full.png')}
+                  resizeMode="contain"
+                  style={{ width: GLASS_W * k, height: GLASS_H * k }}
+                />
+              </Animated.View>
+            </View>
+          )}
         </View>
 
         {/* Everything below the mascot swaps per phase; the mascot above never moves.
@@ -364,14 +367,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   glass: {
-    position: 'absolute',
-  },
-  // A window over just her fist; the mascot inside is offset so only the fist shows through.
-  handClip: {
-    position: 'absolute',
-    overflow: 'hidden',
-  },
-  handImage: {
     position: 'absolute',
   },
   logo: {
