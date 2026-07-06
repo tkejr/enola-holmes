@@ -14,10 +14,11 @@ export const useProfile = (): Profile | null => {
 
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
 
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (cancelled || !session) return;
       const uid = session.user.id;
 
       const apply = (row: { coins?: number; referral_code?: string; referral_count?: number }) =>
@@ -32,6 +33,7 @@ export const useProfile = (): Profile | null => {
         .select('coins, referral_code, referral_count')
         .eq('id', uid)
         .single();
+      if (cancelled) return;
       if (data) apply(data);
 
       channel = supabase
@@ -44,7 +46,7 @@ export const useProfile = (): Profile | null => {
         .subscribe();
     })();
 
-    return () => { if (channel) supabase.removeChannel(channel); };
+    return () => { cancelled = true; if (channel) supabase.removeChannel(channel); };
   }, []);
 
   return profile;
@@ -58,9 +60,11 @@ export const useCoinTransactions = (): { txns: CoinTransaction[]; loading: boole
 
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
 
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled) return;
       if (!session) { setLoading(false); return; }
       const uid = session.user.id;
 
@@ -68,6 +72,7 @@ export const useCoinTransactions = (): { txns: CoinTransaction[]; loading: boole
         .from('coin_transactions')
         .select('id, amount, reason, created_at')
         .order('created_at', { ascending: false });
+      if (cancelled) return;
       setTxns(data ?? []);
       setLoading(false);
 
@@ -81,7 +86,7 @@ export const useCoinTransactions = (): { txns: CoinTransaction[]; loading: boole
         .subscribe();
     })();
 
-    return () => { if (channel) supabase.removeChannel(channel); };
+    return () => { cancelled = true; if (channel) supabase.removeChannel(channel); };
   }, []);
 
   return { txns, loading };

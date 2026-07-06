@@ -207,6 +207,8 @@ export default function WelcomeScreen() {
         <Text style={styles.logo}>Enola</Text>
       </View>
 
+      <Pagination step={7} />
+
       <View style={styles.content}>
         {/* Stars roll in with the referral counter-wheel animation, so they're rendered
             directly (not inside StaggerIn, which would double up the entry). */}
@@ -244,8 +246,6 @@ export default function WelcomeScreen() {
       </Animated.View>
 
       <View style={styles.footer}>
-        <Pagination step={7} />
-
         <HapticTouchable
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleGetStarted}

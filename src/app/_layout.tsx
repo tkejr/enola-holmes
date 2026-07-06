@@ -47,7 +47,6 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="crop" />
-        <Stack.Screen name="select-face" />
         <Stack.Screen name="scanning" />
         <Stack.Screen name="results" />
         <Stack.Screen name="coins" />

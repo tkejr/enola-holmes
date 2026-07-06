@@ -41,6 +41,8 @@ export default function HowFoundScreen() {
         <Text style={styles.logo}>Enola</Text>
       </View>
 
+      <Pagination step={3} />
+
       <StaggerIn style={styles.content}>
         <Text style={styles.title}>How did you find us?</Text>
 
@@ -69,8 +71,6 @@ export default function HowFoundScreen() {
       </StaggerIn>
 
       <View style={styles.footer}>
-        <Pagination step={3} />
-
         <HapticTouchable
           style={[styles.button, !selected && styles.buttonDisabled]}
           onPress={goNext}

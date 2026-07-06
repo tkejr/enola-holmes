@@ -1,27 +1,39 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, ActivityIndicator, LayoutChangeEvent } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { useSharedValue, useDerivedValue, runOnJS } from 'react-native-reanimated';
+import { HapticTouchable } from "@/components/haptic-touchable";
+import { Ionicons } from "@expo/vector-icons";
 import {
   Canvas,
-  Fill,
   Circle,
+  Fill,
   Group,
-  Image as SkiaImage,
-  Skia,
   ImageFormat,
+  Line,
+  Skia,
+  Image as SkiaImage,
   useImage as useSkiaImage,
-} from '@shopify/react-native-skia';
-import { Slider } from '@expo/ui/community/slider';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImageManipulator from 'expo-image-manipulator';
-import { File, Paths } from 'expo-file-system';
-import { HapticTouchable } from '@/components/haptic-touchable';
+  vec,
+} from "@shopify/react-native-skia";
+import { File, Paths } from "expo-file-system";
+import * as ImageManipulator from "expo-image-manipulator";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  LayoutChangeEvent,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import {
+  runOnJS,
+  useDerivedValue,
+  useSharedValue,
+} from "react-native-reanimated";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const MAX_ZOOM = 4; // 4x max magnification
 const RING = 2; // ring stroke width
+const THUMB = 28; // slider thumb diameter
 
 // Circular crop with zoom/pan. The crop circle is FIXED and centered; the image is scaled
 // and panned beneath it (standard avatar cropper). Zoom is driven by pinch, the slider, or
@@ -32,12 +44,17 @@ export default function CropScreen() {
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [sliderVal, setSliderVal] = useState(0); // 0..1 → minScale..minScale*MAX_ZOOM
+  const [sliderW, setSliderW] = useState(0); // measured slider track width
 
   // Bake EXIF rotation; result w/h are the TRUE post-rotation dims (onLoad lies on rotated).
-  const [src, setSrc] = useState<{ uri: string; w: number; h: number } | null>(null);
+  const [src, setSrc] = useState<{ uri: string; w: number; h: number } | null>(
+    null,
+  );
   useEffect(() => {
     let alive = true;
-    ImageManipulator.manipulateAsync(imageUri, [], { format: ImageManipulator.SaveFormat.JPEG })
+    ImageManipulator.manipulateAsync(imageUri, [], {
+      format: ImageManipulator.SaveFormat.JPEG,
+    })
       .then((r) => alive && setSrc({ uri: r.uri, w: r.width, h: r.height }))
       .catch(() => alive && setSrc({ uri: imageUri, w: 0, h: 0 }));
     return () => {
@@ -89,7 +106,7 @@ export default function CropScreen() {
 
   // Keep the image covering the circle: clamp translation so no gap shows inside the circle.
   const clampPan = () => {
-    'worklet';
+    "worklet";
     if (!src?.w) return;
     const halfW = (src.w * scale.value) / 2;
     const halfH = (src.h * scale.value) / 2;
@@ -100,19 +117,19 @@ export default function CropScreen() {
   };
 
   const setZoom = (v: number) => {
-    'worklet';
+    "worklet";
     scale.value = minScale.value * (1 + v * (MAX_ZOOM - 1));
     clampPan();
   };
 
   const pan = Gesture.Pan()
     .onBegin(() => {
-      'worklet';
+      "worklet";
       savedTx.value = tx.value;
       savedTy.value = ty.value;
     })
     .onChange((ev) => {
-      'worklet';
+      "worklet";
       tx.value = savedTx.value + ev.translationX;
       ty.value = savedTy.value + ev.translationY;
       clampPan();
@@ -120,12 +137,15 @@ export default function CropScreen() {
 
   const pinch = Gesture.Pinch()
     .onBegin(() => {
-      'worklet';
+      "worklet";
       savedScale.value = scale.value;
     })
     .onChange((ev) => {
-      'worklet';
-      const next = Math.max(minScale.value, Math.min(savedScale.value * ev.scale, minScale.value * MAX_ZOOM));
+      "worklet";
+      const next = Math.max(
+        minScale.value,
+        Math.min(savedScale.value * ev.scale, minScale.value * MAX_ZOOM),
+      );
       scale.value = next;
       clampPan();
       // reflect back to the slider (0..1)
@@ -135,6 +155,19 @@ export default function CropScreen() {
 
   const gesture = Gesture.Simultaneous(pan, pinch);
 
+  // Custom slider: map an x within the track to 0..1 and drive zoom.
+  const applySlider = (x: number) => {
+    const v = Math.max(
+      0,
+      Math.min(1, sliderW > THUMB ? x / (sliderW - THUMB) : 0),
+    );
+    setSliderVal(v);
+    setZoom(v);
+  };
+  const sliderGesture = Gesture.Pan()
+    .onBegin((e) => runOnJS(applySlider)(e.x - THUMB / 2))
+    .onChange((e) => runOnJS(applySlider)(e.x - THUMB / 2));
+
   // Skia transform for the preview: translate to center, apply scale+pan, draw image so its
   // center sits at origin.
   const transform = useDerivedValue(() => [
@@ -142,6 +175,33 @@ export default function CropScreen() {
     { translateY: cy.value + ty.value },
     { scale: scale.value },
   ]);
+  // Sniper crosshair ticks straddling the ring at N/S/E/W.
+  const TICK = 14;
+  const tickTop = useDerivedValue(() =>
+    vec(cx.value, cy.value - cr.value - TICK),
+  );
+  const tickTopIn = useDerivedValue(() =>
+    vec(cx.value, cy.value - cr.value + TICK),
+  );
+  const tickBot = useDerivedValue(() =>
+    vec(cx.value, cy.value + cr.value - TICK),
+  );
+  const tickBotOut = useDerivedValue(() =>
+    vec(cx.value, cy.value + cr.value + TICK),
+  );
+  const tickLeft = useDerivedValue(() =>
+    vec(cx.value - cr.value - TICK, cy.value),
+  );
+  const tickLeftIn = useDerivedValue(() =>
+    vec(cx.value - cr.value + TICK, cy.value),
+  );
+  const tickRight = useDerivedValue(() =>
+    vec(cx.value + cr.value - TICK, cy.value),
+  );
+  const tickRightOut = useDerivedValue(() =>
+    vec(cx.value + cr.value + TICK, cy.value),
+  );
+
   const imgX = useDerivedValue(() => -(src?.w ?? 0) / 2);
   const imgY = useDerivedValue(() => -(src?.h ?? 0) / 2);
   const imgW = src?.w ?? 0;
@@ -163,7 +223,7 @@ export default function CropScreen() {
       const originY = Math.round(py - pr);
 
       const surface = Skia.Surface.MakeOffscreen(side, side);
-      if (!surface) throw new Error('offscreen surface failed');
+      if (!surface) throw new Error("offscreen surface failed");
       const canvas = surface.getCanvas();
       const path = Skia.Path.Make();
       path.addCircle(side / 2, side / 2, side / 2);
@@ -171,36 +231,103 @@ export default function CropScreen() {
       canvas.drawImage(skiaSrc, -originX, -originY);
       surface.flush();
 
-      const bytes = surface.makeImageSnapshot().encodeToBytes(ImageFormat.PNG, 100);
+      const bytes = surface
+        .makeImageSnapshot()
+        .encodeToBytes(ImageFormat.PNG, 100);
       const file = new File(Paths.cache, `crop-${side}.png`);
       file.write(bytes);
-      router.replace({ pathname: '/select-face', params: { imageUri: file.uri } });
+      router.replace({
+        pathname: "/scanning",
+        params: { imageUri: file.uri },
+      });
     } catch (e) {
-      console.warn('Circular crop failed, using full photo:', e);
-      router.replace({ pathname: '/select-face', params: { imageUri: src?.uri ?? imageUri } });
+      console.warn("Circular crop failed, using full photo:", e);
+      router.replace({
+        pathname: "/scanning",
+        params: { imageUri: src?.uri ?? imageUri },
+      });
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Crop the photo</Text>
+      <View style={styles.header}>
+        <HapticTouchable style={styles.iconBtn} onPress={() => router.back()}>
+          <Ionicons name="close" size={24} color="#1C1C1E" />
+        </HapticTouchable>
+        <View style={styles.headerCenter}>
+          <Text style={styles.title}>Position the face</Text>
+          <Text style={styles.subtitle}>pinch to zoom · drag to move</Text>
+        </View>
+        <HapticTouchable
+          style={styles.iconBtn}
+          onPress={() => router.push("/history")}
+        >
+          <Ionicons name="time-outline" size={24} color="#1C1C1E" />
+        </HapticTouchable>
+      </View>
 
       <GestureDetector gesture={gesture}>
         <View style={styles.stage} onLayout={onLayout}>
           {ready && skiaSrc && (
             <Canvas style={StyleSheet.absoluteFill}>
               <Group transform={transform}>
-                <SkiaImage image={skiaSrc} x={imgX} y={imgY} width={imgW} height={imgH} fit="none" />
+                <SkiaImage
+                  image={skiaSrc}
+                  x={imgX}
+                  y={imgY}
+                  width={imgW}
+                  height={imgH}
+                  fit="none"
+                />
               </Group>
               {/* dim surround with a transparent circular hole. `layer` isolates this into
                   its own offscreen buffer so blendMode="clear" only erases the dim fill —
                   without it, "clear" punches through to the black page and hides the image. */}
               <Group layer>
-                <Fill color="rgba(0,0,0,0.6)" />
-                <Circle cx={cx} cy={cy} r={cr} color="black" blendMode="clear" />
+                <Fill color="rgba(242,241,236,0.7)" />
+                <Circle
+                  cx={cx}
+                  cy={cy}
+                  r={cr}
+                  color="black"
+                  blendMode="clear"
+                />
               </Group>
-              {/* white ring outline */}
-              <Circle cx={cx} cy={cy} r={cr} color="white" style="stroke" strokeWidth={RING} />
+              {/* light ring outline */}
+              <Circle
+                cx={cx}
+                cy={cy}
+                r={cr}
+                color="#D8DEE0"
+                style="stroke"
+                strokeWidth={RING}
+              />
+              {/* sniper crosshair ticks at N/S/E/W */}
+              <Line
+                p1={tickTop}
+                p2={tickTopIn}
+                color="#1C1C1E"
+                strokeWidth={2}
+              />
+              <Line
+                p1={tickBot}
+                p2={tickBotOut}
+                color="#1C1C1E"
+                strokeWidth={2}
+              />
+              <Line
+                p1={tickLeft}
+                p2={tickLeftIn}
+                color="#1C1C1E"
+                strokeWidth={2}
+              />
+              <Line
+                p1={tickRight}
+                p2={tickRightOut}
+                color="#1C1C1E"
+                strokeWidth={2}
+              />
             </Canvas>
           )}
         </View>
@@ -209,28 +336,47 @@ export default function CropScreen() {
       {ready && (
         <View style={styles.sliderRow}>
           <Ionicons name="image-outline" size={16} color="#8E8E93" />
-          <Slider
+          <View
             style={styles.slider}
-            value={sliderVal}
-            minimumValue={0}
-            maximumValue={1}
-            minimumTrackTintColor="#FFFFFF"
-            thumbTintColor="#FFFFFF"
-            onValueChange={(v) => {
-              setSliderVal(v);
-              setZoom(v);
-            }}
-          />
+            onLayout={(e) => setSliderW(e.nativeEvent.layout.width)}
+          >
+            <View style={styles.track} />
+            <View
+              style={[
+                styles.trackFill,
+                { width: sliderVal * (sliderW - THUMB) },
+              ]}
+            />
+            <GestureDetector gesture={sliderGesture}>
+              <View style={StyleSheet.absoluteFill}>
+                <View
+                  style={[
+                    styles.thumb,
+                    { left: sliderVal * (sliderW - THUMB) },
+                  ]}
+                />
+              </View>
+            </GestureDetector>
+          </View>
           <Ionicons name="image" size={24} color="#8E8E93" />
         </View>
       )}
 
       <View style={styles.footer}>
-        <HapticTouchable style={styles.cancelBtn} onPress={() => router.back()}>
-          <Text style={styles.cancelText}>Cancel</Text>
-        </HapticTouchable>
-        <HapticTouchable style={styles.confirmBtn} onPress={confirm} disabled={busy || !ready}>
-          {busy ? <ActivityIndicator color="#1C1C1E" /> : <Text style={styles.confirmText}>Continue</Text>}
+        <Text style={styles.caption}>DRAG THE BAR TO ZOOM-IN</Text>
+        <HapticTouchable
+          style={[styles.searchBtn, (busy || !ready) && styles.searchBtnDisabled]}
+          onPress={confirm}
+          disabled={busy || !ready}
+        >
+          {busy ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <>
+              <Ionicons name="search" size={20} color="#FFFFFF" />
+              <Text style={styles.searchText}>Start Search</Text>
+            </>
+          )}
         </HapticTouchable>
       </View>
     </SafeAreaView>
@@ -238,20 +384,88 @@ export default function CropScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000000' },
-  title: { fontSize: 18, fontWeight: '600', color: '#FFFFFF', textAlign: 'center', paddingVertical: 16 },
+  container: { flex: 1, backgroundColor: "#F2F1EC" },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  iconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#EAE8E1",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerCenter: { flex: 1, alignItems: "center" },
+  title: { fontSize: 22, fontWeight: "700", color: "#1C1C1E" },
+  subtitle: { fontSize: 15, color: "#8E8E93", marginTop: 2 },
   stage: { flex: 1, marginHorizontal: 8 },
   sliderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     paddingHorizontal: 24,
     paddingVertical: 12,
   },
-  slider: { flex: 1, height: 40 },
-  footer: { flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 16 },
-  cancelBtn: { flex: 1, paddingVertical: 16, borderRadius: 14, borderWidth: 1, borderColor: '#3A3A3C', alignItems: 'center' },
-  cancelText: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
-  confirmBtn: { flex: 1, paddingVertical: 16, borderRadius: 14, backgroundColor: '#FFFFFF', alignItems: 'center' },
-  confirmText: { color: '#1C1C1E', fontSize: 17, fontWeight: '600' },
+  slider: { flex: 1, height: 40, justifyContent: "center" },
+  track: {
+    position: "absolute",
+    left: THUMB / 2,
+    right: THUMB / 2,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#C7C4BA",
+  },
+  trackFill: {
+    position: "absolute",
+    left: THUMB / 2,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#1C1C1E",
+  },
+  thumb: {
+    position: "absolute",
+    top: (40 - THUMB) / 2,
+    width: THUMB,
+    height: THUMB,
+    borderRadius: THUMB / 2,
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 3,
+  },
+  footer: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    alignItems: "center",
+    gap: 16,
+  },
+  caption: {
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    color: "#8E8E93",
+  },
+  searchBtn: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: "#1C1C1E",
+    borderRadius: 14,
+    paddingVertical: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  searchBtnDisabled: { opacity: 0.5 },
+  searchText: { color: "#FFFFFF", fontSize: 18, fontWeight: "700" },
 });

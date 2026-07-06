@@ -15,10 +15,13 @@ export function Pagination({ step, total = ONBOARDING_TOTAL }: { step: number; t
 }
 
 const styles = StyleSheet.create({
+  // Top strip under the header. Opaque bg + it lives above the ScrollView in flex flow,
+  // so content scrolls beneath the header/bars rather than showing through them.
   row: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 20,
+    paddingBottom: 16,
+    backgroundColor: '#FAFAFA',
     gap: 6,
   },
   dot: {

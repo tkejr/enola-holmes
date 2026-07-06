@@ -116,6 +116,8 @@ export default function CodeScreen() {
         <Text style={styles.logo}>Enola</Text>
       </View>
 
+      <Pagination step={6} />
+
       {/* No KeyboardAvoidingView: lifting the footer made Redeem/Skip overlap the code
           boxes. Instead the footer is hidden while typing and a down-chevron closes the
           keyboard. Tapping the background also dismisses it. */}
@@ -183,8 +185,6 @@ export default function CodeScreen() {
           keyboard (chevron above, or tap the background) to bring them back. */}
       {!focused && (
         <View style={styles.footer}>
-          <Pagination step={6} />
-
           <HapticTouchable
             style={[styles.button, (code.length !== CODE_LENGTH || checking) && styles.buttonDisabled]}
             onPress={onRedeem}
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 40,
-    paddingBottom: 40,
+    paddingBottom: 8, // SafeAreaView already adds the bottom inset; this footer flows (not absolute)
     paddingTop: 12,
     backgroundColor: '#FAFAFA',
   },

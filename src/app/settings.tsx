@@ -123,7 +123,7 @@ export default function SettingsScreen() {
             onPress={() => router.back()}
             style={styles.closeButton}
           >
-            <Ionicons name="close" size={22} color="#8E8E93" />
+            <Ionicons name="close" size={22} color="#1C1C1E" />
           </HapticTouchable>
         </View>
 
@@ -362,13 +362,18 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     position: 'absolute',
-    right: 20,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F0F0F0',
+    left: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   closeButtonText: {
     fontSize: 20,

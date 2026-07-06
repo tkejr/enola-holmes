@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { uploadAsync } from 'expo-file-system/legacy';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, Text, Image as RNImage, Animated, Dimensions, Alert, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,11 +12,25 @@ import { EnolaHeading } from '@/components/enola-heading';
 
 const { width, height } = Dimensions.get('window');
 
+// Cosmetic scanning overlay: decorative facial-landmark dots shown over the photo while
+// the real search runs server-side. Used as the initial state and as the fallback when
+// the face-detect service is unavailable, so dots always render.
+const FALLBACK_POINTS = [
+  { x: 0.35, y: 0.3, type: 'eye' },
+  { x: 0.65, y: 0.3, type: 'eye' },
+  { x: 0.5, y: 0.45, type: 'nose' },
+  { x: 0.41, y: 0.58, type: 'mouth' },
+  { x: 0.59, y: 0.58, type: 'mouth' },
+  { x: 0.5, y: 0.62, type: 'mouth' },
+  { x: 0.32, y: 0.25, type: 'eyebrow' },
+  { x: 0.68, y: 0.25, type: 'eyebrow' },
+];
+
 export default function ScanningScreen() {
   const { imageUri } = useLocalSearchParams<{ imageUri: string }>();
   const [searchStatus, setSearchStatus] = useState('Analyzing image...');
   const [actualProgress, setActualProgress] = useState(0);
-  const [facialPoints, setFacialPoints] = useState<Array<{ x: number; y: number; type: string }>>([]);
+  const [facialPoints, setFacialPoints] = useState<Array<{ x: number; y: number; type: string }>>(FALLBACK_POINTS);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
   const [imageScale, setImageScale] = useState(1);
@@ -29,30 +44,21 @@ export default function ScanningScreen() {
   const radialPulse = useRef(new Animated.Value(0)).current;
   const cornerScale = useRef(new Animated.Value(0)).current;
 
-  // Cosmetic scanning overlay: draws a grid of facial-landmark dots over the photo while
-  // the real search runs server-side. These are decorative reference points, not a face
-  // detector — the actual matching happens in the face-search Edge Function.
-  const FALLBACK_POINTS = [
-    { x: 0.35, y: 0.3, type: 'eye' },
-    { x: 0.65, y: 0.3, type: 'eye' },
-    { x: 0.5, y: 0.45, type: 'nose' },
-    { x: 0.41, y: 0.58, type: 'mouth' },
-    { x: 0.59, y: 0.58, type: 'mouth' },
-    { x: 0.5, y: 0.62, type: 'mouth' },
-    { x: 0.32, y: 0.25, type: 'eyebrow' },
-    { x: 0.68, y: 0.25, type: 'eyebrow' },
-  ];
-
   const showScanningOverlay = async () => {
     let points = FALLBACK_POINTS;
     const baseUrl = process.env.EXPO_PUBLIC_FACE_DETECT_URL;
     if (baseUrl) {
       try {
-        const form = new FormData();
-        // RN FormData takes a file-descriptor object for the local image uri.
-        form.append('file', { uri: imageUri, name: 'photo.jpg', type: 'image/jpeg' } as any);
-        const res = await fetch(`${baseUrl}/detect-face`, { method: 'POST', body: form });
-        const data = await res.json();
+        // RN FormData/Blob don't work in this runtime; expo-file-system uploadAsync
+        // streams the local file directly (same pattern as utils/faceSearch.ts).
+        const res = await uploadAsync(`${baseUrl}/detect-face`, imageUri, {
+          httpMethod: 'POST',
+          uploadType: 1, // MULTIPART
+          fieldName: 'file',
+          mimeType: imageUri.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg',
+          headers: { accept: 'application/json' },
+        });
+        const data = JSON.parse(res.body);
         if (data?.faceDetected && Array.isArray(data.facialPoints) && data.facialPoints.length > 0) {
           points = data.facialPoints;
         }
@@ -203,7 +209,12 @@ export default function ScanningScreen() {
         setImageScale(scale);
       },
       (error) => {
+        // Fall back to a square fit (the crop is square) so the Canvas + dots still render.
         console.error('Failed to get image dimensions:', error);
+        const s = width - 80;
+        setImageDimensions({ width: s, height: s });
+        setImageOffset({ x: 0, y: 0 });
+        setImageScale(1);
       }
     );
 

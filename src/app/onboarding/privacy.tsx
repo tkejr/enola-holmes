@@ -16,6 +16,8 @@ export default function PrivacyScreen() {
         <Text style={styles.logo}>Enola</Text>
       </View>
 
+      <Pagination step={2} />
+
       <StaggerIn style={styles.content}>
         <View style={styles.iconContainer}>
           <Ionicons name="lock-closed-outline" size={56} color="#1C1C1E" />
@@ -30,8 +32,6 @@ export default function PrivacyScreen() {
       </StaggerIn>
 
       <View style={styles.footer}>
-        <Pagination step={2} />
-
         <HapticTouchable
           style={styles.button}
           onPress={() => router.push('/onboarding/how-found')}

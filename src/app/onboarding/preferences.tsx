@@ -54,6 +54,8 @@ export default function PreferencesScreen() {
         <Text style={styles.logo}>Enola</Text>
       </View>
 
+      <Pagination step={5} />
+
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <StaggerIn>
         <Text style={styles.title}>What result would be most beneficial?</Text>
@@ -88,8 +90,6 @@ export default function PreferencesScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Pagination step={5} />
-
         <HapticTouchable
           style={[styles.button, !selected.length && styles.buttonDisabled]}
           onPress={goNext}

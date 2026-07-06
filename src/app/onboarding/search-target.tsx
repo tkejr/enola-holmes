@@ -23,8 +23,6 @@ const options: Option[] = [
   { id: 'myself', icon: 'diamond-outline', label: 'Myself' },
   { id: 'doppelganger', icon: 'people-outline', label: 'Doppelganger' },
   { id: 'uber', icon: 'car-outline', label: 'Uber drivers' },
-  { id: 'employers', icon: 'briefcase-outline', label: 'Potential employers' },
-  { id: 'employees', icon: 'person-outline', label: 'Potential employees' },
   { id: 'prefer', icon: 'help-circle-outline', label: 'Prefer not to say' },
 ];
 
@@ -52,6 +50,8 @@ export default function SearchTargetScreen() {
         </HapticTouchable>
         <Text style={styles.logo}>Enola</Text>
       </View>
+
+      <Pagination step={4} />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <StaggerIn>
@@ -83,8 +83,6 @@ export default function SearchTargetScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Pagination step={4} />
-
         <HapticTouchable
           style={[styles.button, !selected.length && styles.buttonDisabled]}
           onPress={goNext}

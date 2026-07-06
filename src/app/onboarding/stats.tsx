@@ -16,6 +16,8 @@ export default function StatsScreen() {
         <Text style={styles.logo}>Enola</Text>
       </View>
 
+      <Pagination step={1} />
+
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.content}
@@ -57,8 +59,6 @@ export default function StatsScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Pagination step={1} />
-
         <HapticTouchable
           style={styles.button}
           onPress={() => router.push('/onboarding/privacy')}
