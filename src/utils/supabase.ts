@@ -5,8 +5,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
 const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_KEY || 'placeholder-key'
 
+// A build with placeholder creds loads nothing after onboarding (App Store rejection
+// #6). EAS cloud builds don't read .env.local — vars must be set as EAS env vars on the
+// build's environment. Fail loudly instead of shipping a dead binary: crash release
+// builds at startup, warn in dev.
 if (supabaseUrl === 'https://placeholder.supabase.co') {
-  console.warn('⚠️ Supabase URL not configured. Check your .env.local file.')
+  const msg = '⚠️ Supabase not configured. Set EXPO_PUBLIC_SUPABASE_URL/KEY as EAS env vars (or .env.local for local dev).'
+  if (__DEV__) console.warn(msg)
+  else throw new Error(msg)
 }
 
 export const supabase = createClient(

@@ -1,9 +1,9 @@
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View, Text, TextInput, ActivityIndicator, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { Pressable, StyleSheet, View, Text, TextInput, ActivityIndicator, Keyboard, TouchableWithoutFeedback, Animated } from 'react-native';
 import { HapticTouchable } from '@/components/haptic-touchable';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
@@ -21,8 +21,11 @@ export default function CodeScreen() {
   const [focused, setFocused] = useState(false);
   const [checking, setChecking] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null); // shown red + reddens boxes
+  const [redeemed, setRedeemed] = useState(false); // drives the "Code Redeemed" top toast
   const inputRef = useRef<TextInput>(null);
   const player = useAudioPlayer(tickSound);
+  const toastY = useRef(new Animated.Value(-100)).current;
+  const insets = useSafeAreaInsets();
 
   // Validate the code before advancing. A wrong code must NOT let the user through —
   // only Skip does that. FAIL CLOSED: if we can't confirm the code is real (RPC
@@ -36,7 +39,11 @@ export default function CodeScreen() {
       const { data, error: rpcError } = await supabase.rpc('referral_code_exists', { p_code: code });
       if (rpcError) throw rpcError;
       if (data === true) {
-        router.push({ pathname: '/paywall', params: { code } });
+        Keyboard.dismiss();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setRedeemed(true);
+        // Let the toast land and be seen before moving on.
+        setTimeout(() => router.push({ pathname: '/paywall', params: { code } }), 1100);
       } else {
         setErrorMsg("That code isn't valid. Check it, or tap Skip.");
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -55,6 +62,13 @@ export default function CodeScreen() {
   useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
   }, []);
+
+  // Slide the toast down when a code is redeemed. We navigate away shortly after, so
+  // there's no slide-out — the screen change removes it.
+  useEffect(() => {
+    if (!redeemed) return;
+    Animated.spring(toastY, { toValue: 0, useNativeDriver: true, friction: 8, tension: 80 }).start();
+  }, [redeemed, toastY]);
 
   // One real (hidden) TextInput drives six display boxes. Using a single field means
   // paste, autofill and backspace all "just work" — we only sanitize + cap the value.
@@ -83,6 +97,18 @@ export default function CodeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {redeemed && (
+        <Animated.View
+          style={[styles.toast, { top: insets.top + 8, transform: [{ translateY: toastY }] }]}
+          pointerEvents="none"
+        >
+          <View style={styles.toastTick}>
+            <Ionicons name="checkmark" size={15} color="#FFFFFF" />
+          </View>
+          <Text style={styles.toastText}>Code Redeemed · 1 Coin added</Text>
+        </Animated.View>
+      )}
+
       <View style={styles.header}>
         <HapticTouchable onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="chevron-back" size={24} color="#007AFF" />
@@ -184,6 +210,40 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FAFAFA',
+  },
+  toast: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E5E5EA',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  toastTick: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#34C759',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toastText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    letterSpacing: -0.3,
   },
   header: {
     paddingHorizontal: 20,

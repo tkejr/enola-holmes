@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View, Text, ActivityIndicator, Alert, Animated, Easing, Image } from 'react-native';
+import { StyleSheet, View, Text, ActivityIndicator, Alert, Animated, Easing, Image, useWindowDimensions } from 'react-native';
 import { HapticTouchable } from '@/components/haptic-touchable';
 import Reanimated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,9 +24,9 @@ const ITEM_STAGGER = 400; // ms between each band appearing
 // Enola's raised fist grips a short VERTICAL handle stub with no lens (grip column x~638,
 // handle visible y~353..405 px). The hand-free vector glass supplies lens + full handle;
 // we sink its handle into that same fist so HER fingers wrap it, lens resting above.
-const MASCOT = 260;
+const MASCOT_BASE = 260; // reference size; the real MASCOT scales to screen width at runtime
 const SRC = 1106;
-const S = MASCOT / SRC; // source px -> display px
+const S = MASCOT_BASE / SRC; // source px -> display px (at base size; multiply by `k` for actual)
 // Where the vector lens should rest, and the grip column it must line up with (source px).
 const LENS_CX = 634 * S; // centered on the dark handle-stub she actually grips (src x~628-644)
 const LENS_CY = 250 * S; // lens rests above the raised hand; handle runs down through her fist
@@ -48,6 +48,19 @@ const FIST_W = 58 * S;
 const FIST_H = 62 * S;
 
 export default function HomeScreen() {
+  const { width, height } = useWindowDimensions();
+  // Scale the whole mascot rig to the device: fill ~62% of width, but never dwarf a short
+  // screen or balloon on a tablet. Everything mascot-relative (glass, fist) derives from `k`,
+  // so scaling this one number keeps the lens/fist alignment correct on every aspect ratio.
+  // Fit the smaller of width/height so it never overflows either dimension, and cap at 360 so
+  // it doesn't balloon on a tablet. No 200 floor: `Math.max(200, ...)` defeated the height
+  // guard and overflowed short/landscape screens.
+  const MASCOT = Math.min(width * 0.62, height * 0.34, 360);
+  const k = MASCOT / MASCOT_BASE;
+  // phaseBox height also tracks the mascot so the mascot+text block stays vertically centered
+  // and never overflows a small screen.
+  const phaseBoxHeight = Math.min(260, height * 0.34);
+
   const [isLoading, setIsLoading] = useState(true);
   // 'landing' -> 'find' -> 'photo' -> navigate to onboarding. The mascot never moves.
   const [phase, setPhase] = useState<'landing' | 'find' | 'photo'>('landing');
@@ -160,14 +173,14 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <View style={styles.mascotBox}>
+        <View style={[styles.mascotBox, { width: MASCOT, height: MASCOT }]}>
           {/* The mascot with an EMPTY hand — no glass in it while the animation plays,
               so there's never a double glass. The flying vector glass below becomes the
               one she holds once it settles. */}
           <Image
             source={require('../../assets/images/enola-nolens.png')}
             resizeMode="contain"
-            style={styles.mascot}
+            style={[styles.mascot, { width: MASCOT, height: MASCOT }]}
           />
           {/* A hand-free glass: lens + full handle only. Starts lifted & a bit bigger, then
               eases down until its full handle sinks into her fist and stays gripped. */}
@@ -175,32 +188,42 @@ export default function HomeScreen() {
             style={[
               styles.glass,
               {
+                left: GLASS_LEFT * k,
+                top: GLASS_TOP * k,
+                width: GLASS_W * k,
+                height: GLASS_H * k,
                 transform: [
-                  { translateX: glass.interpolate({ inputRange: [0, 1], outputRange: [GLASS_FLY_X, 0] }) },
-                  { translateY: glass.interpolate({ inputRange: [0, 1], outputRange: [GLASS_FLY_Y, 0] }) },
+                  { translateX: glass.interpolate({ inputRange: [0, 1], outputRange: [GLASS_FLY_X * k, 0] }) },
+                  { translateY: glass.interpolate({ inputRange: [0, 1], outputRange: [GLASS_FLY_Y * k, 0] }) },
                   { scale: glass.interpolate({ inputRange: [0, 1], outputRange: [2.2, 1] }) },
                   { rotate: glass.interpolate({ inputRange: [0, 1], outputRange: ['-8deg', '0deg'] }) },
                 ],
               },
             ]}
           >
-            <MagnifyingGlass size={GLASS_W} />
+            <MagnifyingGlass size={GLASS_W * k} />
           </Animated.View>
           {/* Her fist, drawn again ON TOP of the settled glass so her fingers occlude the
               handle passing through them — the grip looks continuous, not cut off. Fades in
               only once the glass has landed, so it never covers the big flying glass. */}
-          <Animated.View style={[styles.handClip, { opacity: glass }]} pointerEvents="none">
+          <Animated.View
+            style={[
+              styles.handClip,
+              { left: FIST_X * k, top: FIST_Y * k, width: FIST_W * k, height: FIST_H * k, opacity: glass },
+            ]}
+            pointerEvents="none"
+          >
             <Image
               source={require('../../assets/images/enola-nolens.png')}
               resizeMode="contain"
-              style={styles.handImage}
+              style={[styles.handImage, { left: -FIST_X * k, top: -FIST_Y * k, width: MASCOT, height: MASCOT }]}
             />
           </Animated.View>
         </View>
 
         {/* Everything below the mascot swaps per phase; the mascot above never moves.
             A fixed-height box reserves the space so nothing re-centers between phases. */}
-        <View style={styles.phaseBox}>
+        <View style={[styles.phaseBox, { height: phaseBoxHeight }]}>
           {phase === 'landing' && (
             <Reanimated.View
               key="landing"
@@ -278,15 +301,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 40,
+    // Keep the column phone-width and centered on tablets so text/button don't stretch
+    // edge-to-edge across a wide screen.
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
+  // Size set inline (scales with device); see MASCOT in the component.
   mascotBox: {
-    width: MASCOT,
-    height: MASCOT,
     marginBottom: 16,
   },
-  // Fixed-height area under the mascot so swapping phase content never shifts the mascot.
+  // Height set inline so it tracks the mascot; reserves space so swapping phase content
+  // never shifts the mascot.
   phaseBox: {
-    height: 260,
     width: '100%',
   },
   phaseCenter: {
@@ -332,33 +359,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textDecorationLine: 'underline',
   },
+  // Dimensions set inline (scale with device).
   mascot: {
     position: 'absolute',
-    width: MASCOT,
-    height: MASCOT,
   },
   glass: {
     position: 'absolute',
-    left: GLASS_LEFT,
-    top: GLASS_TOP,
-    width: GLASS_W,
-    height: GLASS_H,
   },
   // A window over just her fist; the mascot inside is offset so only the fist shows through.
   handClip: {
     position: 'absolute',
-    left: FIST_X,
-    top: FIST_Y,
-    width: FIST_W,
-    height: FIST_H,
     overflow: 'hidden',
   },
   handImage: {
     position: 'absolute',
-    left: -FIST_X,
-    top: -FIST_Y,
-    width: MASCOT,
-    height: MASCOT,
   },
   logo: {
     fontSize: 32,

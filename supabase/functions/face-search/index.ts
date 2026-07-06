@@ -36,7 +36,11 @@ async function spendCoin(userJwt: string): Promise<number | null> {
 }
 
 // Refund via add_coins — users are revoked from it, so this uses the service_role key.
-async function refundCoin(userId: string): Promise<void> {
+// p_external_id ties the refund to the specific search: add_coins dedupes on
+// (source, external_id), so a retried/duplicated call for the same search can't
+// double-credit. Falls back to no key only if the search never got an id (upload
+// failed before id_search existed) — at most one refund fires per request anyway.
+async function refundCoin(userId: string, idSearch: string | null): Promise<void> {
   await fetch(`${SUPABASE_URL}/rest/v1/rpc/add_coins`, {
     method: 'POST',
     headers: {
@@ -49,6 +53,7 @@ async function refundCoin(userId: string): Promise<void> {
       p_amount: 1,
       p_reason: 'scan_refund',
       p_source: 'face-search',
+      p_external_id: idSearch,
     }),
   }).catch(() => {}) // best-effort; a failed refund must not mask the original error
 }
@@ -117,6 +122,8 @@ serve(async (req) => {
 
   // Everything past the charge: any error/timeout refunds the coin exactly once, so a
   // FaceCheck failure never costs the user. Success returns the items and keeps the coin.
+  // Hoisted so the catch can pass it as the refund's dedupe key.
+  let idSearch: string | null = null
   try {
     // Step 1: upload the image to FaceCheck.
     const uploadBody = new FormData()
@@ -131,7 +138,7 @@ serve(async (req) => {
     if (!uploadData || uploadData.error) {
       throw { error: uploadData?.error ?? 'upload_failed', code: uploadData?.code }
     }
-    const idSearch = uploadData.id_search
+    idSearch = uploadData.id_search
     if (!idSearch) throw { error: 'no_search_id' }
 
     // Step 2: poll for results (up to ~2 min). Server-side polling keeps the token here.
@@ -164,7 +171,7 @@ serve(async (req) => {
     }
     throw { error: 'search_timeout' }
   } catch (err) {
-    await refundCoin(user.id)
+    await refundCoin(user.id, idSearch)
     const e = err as { error?: string; code?: string }
     return json({ error: e?.error ?? 'search_failed', code: e?.code, refunded: true }, 200)
   }
