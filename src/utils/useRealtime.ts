@@ -36,6 +36,11 @@ export const useProfile = (): Profile | null => {
       if (cancelled) return;
       if (data) apply(data);
 
+      // Remove any stale channel with this topic first — supabase caches channels
+      // by topic, so a double-mounted effect (StrictMode) would otherwise reuse an
+      // already-subscribed instance and `.on()` throws. ponytail: cheap idempotency guard.
+      supabase.getChannels().filter((c) => c.topic === `realtime:profile:${uid}`).forEach((c) => supabase.removeChannel(c));
+
       channel = supabase
         .channel(`profile:${uid}`)
         .on(
@@ -75,6 +80,8 @@ export const useCoinTransactions = (): { txns: CoinTransaction[]; loading: boole
       if (cancelled) return;
       setTxns(data ?? []);
       setLoading(false);
+
+      supabase.getChannels().filter((c) => c.topic === `realtime:txns:${uid}`).forEach((c) => supabase.removeChannel(c));
 
       channel = supabase
         .channel(`txns:${uid}`)

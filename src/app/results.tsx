@@ -131,12 +131,18 @@ export default function ResultsScreen() {
     if (resultsData) {
       try {
         const parsed: FaceCheckResult[] = JSON.parse(resultsData);
-        setTotalResults(parsed.length);
+        // Keep only high-confidence matches, capped at the top 50; drop the irrelevant long tail.
+        // ponytail: fixed 70% threshold + 50 cap, make them params if product wants them tunable
+        const relevant = parsed
+          .filter((r) => r.score >= 70)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 50);
+        setTotalResults(relevant.length);
 
         // Categorize by platform
         const categorized: Record<string, CategorizedResult[]> = {};
 
-        parsed.forEach((result) => {
+        relevant.forEach((result) => {
           const { platform, color, icon, username } = detectPlatform(result.url);
           const categorizedResult: CategorizedResult = {
             ...result,
@@ -202,7 +208,7 @@ export default function ResultsScreen() {
             </Text>
             {sortedPlatforms.length > 0 && (
               <View style={styles.platformTags}>
-                {sortedPlatforms.slice(0, 5).map((platform) => (
+                {sortedPlatforms.map((platform) => (
                   <View key={platform} style={styles.platformTag}>
                     <Ionicons name={categorizedResults[platform][0].platformIcon as any} size={16} color={categorizedResults[platform][0].platformColor} />
                     <Text style={styles.platformTagText}>

@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { uploadAsync } from 'expo-file-system/legacy';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View, Text, Image as RNImage, Animated, Dimensions, Alert, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -30,7 +30,12 @@ export default function ScanningScreen() {
   const { imageUri } = useLocalSearchParams<{ imageUri: string }>();
   const [searchStatus, setSearchStatus] = useState('Analyzing image...');
   const [actualProgress, setActualProgress] = useState(0);
-  const [facialPoints, setFacialPoints] = useState<Array<{ x: number; y: number; type: string }>>(FALLBACK_POINTS);
+  // Detected landmarks (null until resolved). Dots wander until this is set, then lock onto them.
+  const [facialPoints, setFacialPoints] = useState<Array<{ x: number; y: number; type: string }> | null>(null);
+  const [clockTick, setClockTick] = useState(0);   // 0→1 looping clock, drives the wander
+  const [lockProgress, setLockProgress] = useState(0); // 0→1 once, dots ease onto landmarks
+  const clockAnim = useRef(new Animated.Value(0)).current;
+  const lockAnim = useRef(new Animated.Value(0)).current;
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
   const [imageScale, setImageScale] = useState(1);
@@ -38,7 +43,6 @@ export default function ScanningScreen() {
   const skiaImage = useImage(imageUri); // Load image for Skia
   const scanProgress = useRef(new Animated.Value(0)).current;
   const scanProgress2 = useRef(new Animated.Value(0)).current;
-  const pointsOpacity = useRef<Animated.Value[]>([]);
   const glowPulse = useRef(new Animated.Value(0)).current;
   const progressValue = useRef(new Animated.Value(0)).current;
   const radialPulse = useRef(new Animated.Value(0)).current;
@@ -67,7 +71,6 @@ export default function ScanningScreen() {
       }
     }
     setFacialPoints(points);
-    pointsOpacity.current = points.map(() => new Animated.Value(0));
   };
 
   const searchByFace = async () => {
@@ -224,6 +227,18 @@ export default function ScanningScreen() {
     // Start the face search
     searchByFace();
 
+    // Free-running clock (loops forever). Sampled to state so the wandering dots re-render each
+    // frame. useNativeDriver:false is required because Skia reads the JS value, not the anim node.
+    const clockId = clockAnim.addListener(({ value }) => setClockTick(value));
+    Animated.loop(
+      Animated.timing(clockAnim, {
+        toValue: 1,
+        duration: 6000,
+        easing: Easing.linear,
+        useNativeDriver: false,
+      })
+    ).start();
+
     // Corner brackets scale in
     Animated.spring(cornerScale, {
       toValue: 1,
@@ -289,6 +304,7 @@ export default function ScanningScreen() {
       ])
     ).start();
 
+    return () => clockAnim.removeListener(clockId);
   }, []);
 
   // Animate progress bar when actualProgress changes
@@ -299,6 +315,19 @@ export default function ScanningScreen() {
       useNativeDriver: false,
     }).start();
   }, [actualProgress]);
+
+  // Once landmarks resolve, ease every dot from its wandering position onto its target (lock-on).
+  useEffect(() => {
+    if (!facialPoints) return;
+    const id = lockAnim.addListener(({ value }) => setLockProgress(value));
+    Animated.timing(lockAnim, {
+      toValue: 1,
+      duration: 1400,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+    return () => lockAnim.removeListener(id);
+  }, [facialPoints]);
 
   const scanTranslateY = scanProgress.interpolate({
     inputRange: [0, 1],
@@ -336,6 +365,12 @@ export default function ScanningScreen() {
   });
 
   const imageSize = width - 80;
+  // Circular clip for the whole scan (image + dots + lines): inscribed circle of the square card.
+  const circleClip = useMemo(() => {
+    const p = Skia.Path.Make();
+    p.addCircle(imageSize / 2, imageSize / 2, imageSize / 2);
+    return p;
+  }, [imageSize]);
 
   console.log('🎨 Rendering ScanningScreen');
   console.log('📐 imageSize (container):', imageSize);
@@ -370,73 +405,89 @@ export default function ScanningScreen() {
             <View style={styles.imageCard}>
               {/* Use Skia Canvas to draw image AND dots together */}
               {skiaImage && imageDimensions.width > 0 && (
-                <Canvas style={{ width: '100%', height: '100%', backgroundColor: 'black' }}>
-                  <SkiaImage
-                    image={skiaImage}
-                    x={imageOffset.x}
-                    y={imageOffset.y}
-                    width={imageDimensions.width}
-                    height={imageDimensions.height}
-                  />
-                  <Group>
-                    {/* Draw connection lines first (so dots appear on top) */}
-                    {facialPoints.map((point, index) => {
-                      const x1 = point.x * imageDimensions.width + imageOffset.x;
-                      const y1 = point.y * imageDimensions.height + imageOffset.y;
+                <Canvas style={{ width: '100%', height: '100%' }}>
+                  {/* Clip everything to a circle so the black letterbox corners disappear and the
+                      whole scan reads as a circular lens. Image covers the full square (no
+                      letterbox), the circle trims the overflow. */}
+                  <Group clip={circleClip}>
+                    <SkiaImage
+                      image={skiaImage}
+                      x={0}
+                      y={0}
+                      width={imageSize}
+                      height={imageSize}
+                      fit="cover"
+                    />
+                    <Group>
+                    {(() => {
+                      // Map over the full square (image now covers it), matching the covered image.
+                      const W = imageSize;
+                      const H = imageSize;
+                      const cx0 = 0;
+                      const cy0 = 0;
+                      const t = clockTick * Math.PI * 2; // 0→2π each loop
 
-                      // Connect to next point of same type
-                      const nextIndex = facialPoints.findIndex((p, i) =>
-                        i > index && p.type === point.type
-                      );
+                      // Dots wander (Lissajous around a seeded home) until landmarks resolve, then
+                      // ease onto their targets as lockProgress 0→1. Pool size = landmark count once
+                      // known, otherwise 40 searching dots. Seeds are deterministic (index-based).
+                      const count = facialPoints ? facialPoints.length : 40;
+                      const dots = Array.from({ length: count }, (_, i) => {
+                        const seed = i * 12.9898;
+                        const home = { x: (Math.sin(seed) * 0.5 + 0.5), y: (Math.sin(seed * 1.7) * 0.5 + 0.5) };
+                        // wandering position (normalized 0..1)
+                        let wx = home.x + 0.12 * Math.sin(t + i);
+                        let wy = home.y + 0.12 * Math.cos(t * 1.3 + i * 0.7);
+                        // Keep wanderers inside the circle (center 0.5, radius 0.46) so no dot lands
+                        // in the clipped-off corners — pull any stray point back onto the circle.
+                        const dx = wx - 0.5, dy = wy - 0.5;
+                        const dist = Math.hypot(dx, dy);
+                        if (dist > 0.46) {
+                          wx = 0.5 + (dx / dist) * 0.46;
+                          wy = 0.5 + (dy / dist) * 0.46;
+                        }
+                        const target = facialPoints?.[i] ?? { x: wx, y: wy, type: 'wander' };
+                        const nx = wx + (target.x - wx) * lockProgress;
+                        const ny = wy + (target.y - wy) * lockProgress;
+                        return {
+                          type: target.type,
+                          px: nx * W + cx0,
+                          py: ny * H + cy0,
+                        };
+                      });
 
-                      if (nextIndex !== -1 && nextIndex === index + 1) {
-                        const nextPoint = facialPoints[nextIndex];
-                        const x2 = nextPoint.x * imageDimensions.width + imageOffset.x;
-                        const y2 = nextPoint.y * imageDimensions.height + imageOffset.y;
+                      // Connection lines only make sense once locked onto real landmarks; fade in
+                      // over the back half of the lock so wandering dots stay unconnected.
+                      const lineAlpha = facialPoints ? Math.max(0, (lockProgress - 0.5) / 0.5) * 0.5 : 0;
 
-                        return (
-                          <SkiaLine
-                            key={`line-${index}`}
-                            p1={{ x: x1, y: y1 }}
-                            p2={{ x: x2, y: y2 }}
-                            color="rgba(14, 165, 233, 0.4)"
-                            strokeWidth={1}
-                          />
-                        );
-                      }
-                      return null;
-                    })}
-
-                    {/* Draw facial points with glow effect */}
-                    {facialPoints.map((point, index) => {
-                      const x = point.x * imageDimensions.width + imageOffset.x;
-                      const y = point.y * imageDimensions.height + imageOffset.y;
                       return (
-                        <Group key={`dot-${index}`}>
-                          {/* Outer glow */}
-                          <SkiaCircle
-                            cx={x}
-                            cy={y}
-                            r={4}
-                            color="rgba(14, 165, 233, 0.3)"
-                          />
-                          {/* Main dot */}
-                          <SkiaCircle
-                            cx={x}
-                            cy={y}
-                            r={2.5}
-                            color="#0EA5E9"
-                          />
-                          {/* Inner highlight */}
-                          <SkiaCircle
-                            cx={x}
-                            cy={y}
-                            r={1}
-                            color="rgba(255, 255, 255, 0.8)"
-                          />
-                        </Group>
+                        <>
+                          {facialPoints && dots.map((point, index) => {
+                            const next = dots[index + 1];
+                            if (next && next.type === point.type) {
+                              return (
+                                <SkiaLine
+                                  key={`line-${index}`}
+                                  p1={{ x: point.px, y: point.py }}
+                                  p2={{ x: next.px, y: next.py }}
+                                  color={`rgba(10, 132, 255, ${lineAlpha})`}
+                                  strokeWidth={1}
+                                />
+                              );
+                            }
+                            return null;
+                          })}
+
+                          {dots.map((point, index) => (
+                            <Group key={`dot-${index}`}>
+                              <SkiaCircle cx={point.px} cy={point.py} r={4} color="rgba(10, 132, 255, 0.35)" />
+                              <SkiaCircle cx={point.px} cy={point.py} r={2.5} color="#0A84FF" />
+                              <SkiaCircle cx={point.px} cy={point.py} r={1} color="rgba(255, 255, 255, 0.8)" />
+                            </Group>
+                          ))}
+                        </>
                       );
-                    })}
+                    })()}
+                    </Group>
                   </Group>
                 </Canvas>
               )}
@@ -454,12 +505,6 @@ export default function ScanningScreen() {
                   ]}
                 />
 
-                {/* Corner Indicators */}
-                <Animated.View style={[styles.cornerTL, { transform: [{ scale: cornerScale }] }]} />
-                <Animated.View style={[styles.cornerTR, { transform: [{ scale: cornerScale }] }]} />
-                <Animated.View style={[styles.cornerBL, { transform: [{ scale: cornerScale }] }]} />
-                <Animated.View style={[styles.cornerBR, { transform: [{ scale: cornerScale }] }]} />
-
                 {/* Primary Scan Line */}
                 <Animated.View
                   style={[
@@ -471,7 +516,7 @@ export default function ScanningScreen() {
                   ]}
                 >
                   <LinearGradient
-                    colors={['rgba(14, 165, 233, 0)', 'rgba(14, 165, 233, 0.3)', '#0EA5E9', 'rgba(14, 165, 233, 0.3)', 'rgba(14, 165, 233, 0)']}
+                    colors={['rgba(10, 132, 255, 0)', 'rgba(10, 132, 255, 0.4)', '#0A84FF', 'rgba(10, 132, 255, 0.4)', 'rgba(10, 132, 255, 0)']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.scanLineGradient}
@@ -489,7 +534,7 @@ export default function ScanningScreen() {
                   ]}
                 >
                   <LinearGradient
-                    colors={['rgba(14, 165, 233, 0)', '#0EA5E9', 'rgba(14, 165, 233, 0)']}
+                    colors={['rgba(10, 132, 255, 0)', '#0A84FF', 'rgba(10, 132, 255, 0)']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.scanLineGradient}
@@ -524,7 +569,7 @@ export default function ScanningScreen() {
                 ]}
               >
                 <LinearGradient
-                  colors={['#0EA5E9', '#0284C7', '#0369A1']}
+                  colors={['#000000', '#000000', '#000000']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.progressGradient}
@@ -609,10 +654,10 @@ const styles = StyleSheet.create({
   imageCard: {
     width: width - 80,
     height: width - 80,
-    borderRadius: 24,
+    borderRadius: (width - 80) / 2, // circle
     overflow: 'hidden',
     backgroundColor: '#FFFFFF',
-    shadowColor: '#0EA5E9',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 24,
@@ -628,14 +673,15 @@ const styles = StyleSheet.create({
     left: -4,
     right: -4,
     bottom: -4,
-    borderRadius: 28,
-    backgroundColor: '#0EA5E9',
+    borderRadius: (width - 80) / 2 + 4, // circular halo
+    backgroundColor: '#000000',
     opacity: 0.2,
     zIndex: -1,
   },
   scanOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(14, 165, 233, 0.03)',
+    borderRadius: (width - 80) / 2, // clip scan lines to the circle
+    overflow: 'hidden',
   },
   radialPulse: {
     position: 'absolute',
@@ -647,8 +693,8 @@ const styles = StyleSheet.create({
     marginTop: -50,
     borderRadius: 50,
     borderWidth: 2,
-    borderColor: '#0EA5E9',
-    backgroundColor: 'rgba(14, 165, 233, 0.1)',
+    borderColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   cornerTL: {
     position: 'absolute',
@@ -658,7 +704,7 @@ const styles = StyleSheet.create({
     height: 24,
     borderTopWidth: 3,
     borderLeftWidth: 3,
-    borderColor: '#0EA5E9',
+    borderColor: '#000000',
     borderTopLeftRadius: 4,
     zIndex: 9999,
   },
@@ -670,7 +716,7 @@ const styles = StyleSheet.create({
     height: 24,
     borderTopWidth: 3,
     borderRightWidth: 3,
-    borderColor: '#0EA5E9',
+    borderColor: '#000000',
     borderTopRightRadius: 4,
     zIndex: 9999,
   },
@@ -682,7 +728,7 @@ const styles = StyleSheet.create({
     height: 24,
     borderBottomWidth: 3,
     borderLeftWidth: 3,
-    borderColor: '#0EA5E9',
+    borderColor: '#000000',
     borderBottomLeftRadius: 4,
   },
   cornerBR: {
@@ -693,7 +739,7 @@ const styles = StyleSheet.create({
     height: 24,
     borderBottomWidth: 3,
     borderRightWidth: 3,
-    borderColor: '#0EA5E9',
+    borderColor: '#000000',
     borderBottomRightRadius: 4,
   },
   facialDot: {
@@ -722,7 +768,7 @@ const styles = StyleSheet.create({
   scanLineGradient: {
     width: '100%',
     height: '100%',
-    shadowColor: '#0EA5E9',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
     shadowRadius: 20,
@@ -731,13 +777,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
     padding: 20,
-    shadowColor: '#0EA5E9',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
     borderWidth: 1,
-    borderColor: '#E0F2FE',
+    borderColor: '#E5E5EA',
   },
   progressHeader: {
     flexDirection: 'row',
@@ -754,12 +800,12 @@ const styles = StyleSheet.create({
   progressPercent: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#0EA5E9',
+    color: '#000000',
     letterSpacing: -0.3,
   },
   progressBarContainer: {
     height: 8,
-    backgroundColor: '#E0F2FE',
+    backgroundColor: '#E5E5EA',
     borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 12,
