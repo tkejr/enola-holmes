@@ -8,9 +8,12 @@ import * as Clipboard from 'expo-clipboard';
 import * as StoreReview from 'expo-store-review';
 import { LEGAL_URLS } from '@/components/subscription-disclosure';
 import { useProfile } from '@/utils/useRealtime';
+import { usePostHog } from 'posthog-react-native';
+import * as Sentry from '@sentry/react-native';
 
 export default function SettingsScreen() {
   const params = useLocalSearchParams<{ code?: string; count?: string }>();
+  const posthog = usePostHog();
   // Live profile drives the values; nav params seed the first paint so there's no
   // pop-in when arriving from the coins screen. The hook wins once it resolves.
   const profile = useProfile();
@@ -103,6 +106,10 @@ export default function SettingsScreen() {
               });
               if (!res.ok) throw new Error(String(res.status));
               await supabase.auth.signOut();
+              // Clear both analytics + crash identities so the deleted user isn't
+              // linked to whoever signs up next on this device.
+              posthog.reset();
+              Sentry.setUser(null);
               router.replace('/');
             } catch (e) {
               console.error('Delete account failed:', e);

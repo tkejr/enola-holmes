@@ -69,7 +69,16 @@
         {
           "microphonePermission": false
         }
-      ]
+      ],
+      [
+        "@sentry/react-native",
+        {
+          "url": "https://sentry.io/",
+          "organization": "bit-wise",
+          "project": "enola"
+        }
+      ],
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,

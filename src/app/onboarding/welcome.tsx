@@ -6,7 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { setOnboardingCompleted } from '../../utils/storage';
 import { onboardingAnswers } from '../../utils/onboardingAnswers';
 import { supabase } from '../../utils/supabase';
-import { identifyUser } from '../../utils/revenuecat';
+import { identify } from '../../utils/identity';
+import { usePostHog } from 'posthog-react-native';
 import { StaggerIn } from '../../components/stagger-in';
 import { Pagination } from '../../components/pagination';
 import { useState, useMemo, useEffect } from 'react';
@@ -85,6 +86,7 @@ function ReviewCard({ review, index, scrollX }: { review: typeof REVIEWS[number]
 
 export default function WelcomeScreen() {
   const { code } = useLocalSearchParams<{ code?: string }>();
+  const posthog = usePostHog();
   const [loading, setLoading] = useState(false);
   const scrollX = useSharedValue(0);
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
@@ -149,10 +151,11 @@ export default function WelcomeScreen() {
 
       console.log('User account created:', userId);
 
-      // Tie RevenueCat to this Supabase user BEFORE they can reach the paywall/coin store.
-      // Without this, a first purchase is attributed to RC's anonymous id and the webhook
-      // can't map it to this profile — coins would be credited to nobody.
-      await identifyUser(userId);
+      // Tie this Supabase user to RevenueCat/PostHog/Sentry BEFORE they can reach
+      // the paywall or hit an error. Without RC identify, a first purchase maps to
+      // RC's anonymous id and the webhook credits coins to nobody; without Sentry
+      // setUser, an onboarding error would report as <anonymous>.
+      await identify(userId, posthog);
 
       // Create profile using RPC function
       const { data: profileResult, error: profileError } = await supabase
