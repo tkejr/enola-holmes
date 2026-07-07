@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 100 },
   emptyIconContainer: {
     width: 100, height: 100, borderRadius: 50,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#F5F5F5',
     justifyContent: 'center', alignItems: 'center', marginBottom: 24,
   },
   emptyTitle: {

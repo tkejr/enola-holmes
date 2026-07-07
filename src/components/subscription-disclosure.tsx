@@ -68,7 +68,7 @@ export function SubscriptionDisclosure() {
 const styles = StyleSheet.create({
   container: { marginTop: 8, paddingHorizontal: 8, alignItems: 'center', gap: 12 },
   restoreBtn: { paddingVertical: 8 },
-  restoreText: { fontSize: 15, fontWeight: '600', color: '#007AFF', letterSpacing: -0.3 },
+  restoreText: { fontSize: 15, fontWeight: '600', color: '#000000', letterSpacing: -0.3 },
   disclosure: { fontSize: 11, lineHeight: 16, color: '#8E8E93', textAlign: 'center' },
   linksRow: { flexDirection: 'row', alignItems: 'center' },
   link: { fontSize: 12, color: '#8E8E93', textDecorationLine: 'underline' },

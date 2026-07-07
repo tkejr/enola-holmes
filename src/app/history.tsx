@@ -128,7 +128,7 @@ export default function HistoryScreen() {
                   </View>
                 </View>
                 <View style={styles.arrowContainer}>
-                  <Ionicons name="chevron-forward" size={18} color="#0EA5E9" />
+                  <Ionicons name="chevron-forward" size={18} color="#000000" />
                 </View>
               </HapticTouchable>
             ))
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#F5F5F5',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
   },
   resultsBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#F5F5F5',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
   resultsText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#0EA5E9',
+    color: '#000000',
     letterSpacing: -0.2,
   },
   arrowContainer: {
@@ -296,11 +296,11 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#F5F5F5',
   },
   arrowIcon: {
     fontSize: 18,
-    color: '#0EA5E9',
+    color: '#000000',
     fontWeight: '600',
   },
 });

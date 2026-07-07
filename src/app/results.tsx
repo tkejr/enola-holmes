@@ -223,8 +223,8 @@ export default function ResultsScreen() {
                     <Ionicons name={categorizedResults[platform][0].platformIcon as any} size={24} color={categorizedResults[platform][0].platformColor} />
                     <Text style={styles.platformTitle}>{platform}</Text>
                   </View>
-                  <View style={[styles.platformBadge, { backgroundColor: `${categorizedResults[platform][0].platformColor}15` }]}>
-                    <Text style={[styles.platformCount, { color: categorizedResults[platform][0].platformColor }]}>
+                  <View style={[styles.platformBadge, { backgroundColor: '#F0F0F0' }]}>
+                    <Text style={[styles.platformCount, { color: '#000000' }]}>
                       {categorizedResults[platform].length}
                     </Text>
                   </View>
@@ -255,7 +255,7 @@ export default function ResultsScreen() {
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={['#0EA5E9', '#0284C7']}
+                colors={['#000000', '#000000']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.buttonGradient}
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     borderWidth: 4,
     borderColor: '#FFFFFF',
-    shadowColor: '#0EA5E9',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,
     shadowRadius: 16,
@@ -361,13 +361,13 @@ const styles = StyleSheet.create({
     padding: 24,
     marginBottom: 24,
     alignItems: 'center',
-    shadowColor: '#0EA5E9',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 3,
     borderWidth: 1,
-    borderColor: '#E0F2FE',
+    borderColor: '#E5E5EA',
   },
   summaryTitle: {
     fontSize: 18,
@@ -379,7 +379,7 @@ const styles = StyleSheet.create({
   summaryCount: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#0EA5E9',
+    color: '#000000',
     marginBottom: 16,
     letterSpacing: -1,
   },
@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
   platformTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#F5F5F5',
     borderRadius: 12,
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
   platformTagText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0EA5E9',
+    color: '#000000',
     letterSpacing: -0.2,
   },
   platformSection: {
@@ -464,9 +464,9 @@ const styles = StyleSheet.create({
   placeholderThumbnail: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#F5F5F5',
     borderWidth: 2,
-    borderColor: '#E0F2FE',
+    borderColor: '#E5E5EA',
     borderStyle: 'dashed',
   },
   placeholderIcon: {
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
   username: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0EA5E9',
+    color: '#000000',
     letterSpacing: -0.3,
   },
   resultUrl: {
@@ -521,11 +521,11 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#F5F5F5',
   },
   arrowIcon: {
     fontSize: 18,
-    color: '#0EA5E9',
+    color: '#000000',
     fontWeight: '600',
   },
   noResultsCard: {
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#F0F9FF',
+    backgroundColor: '#F5F5F5',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
@@ -573,7 +573,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     borderRadius: 16,
-    shadowColor: '#0EA5E9',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -596,7 +596,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: '#E0F2FE',
+    borderColor: '#E5E5EA',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
@@ -604,7 +604,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   secondaryButtonText: {
-    color: '#0EA5E9',
+    color: '#000000',
     fontSize: 17,
     fontWeight: '600',
     letterSpacing: -0.3,

@@ -145,7 +145,7 @@ export default function CoinsScreen() {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Ionicons name="chevron-back" size={28} color="#007AFF" />
+          <Ionicons name="chevron-back" size={28} color="#000000" />
         </HapticTouchable>
         <EnolaHeading style={styles.logo} />
         <View style={styles.coinBadge}>
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 28,
-    color: "#007AFF",
+    color: "#000000",
     fontWeight: "300",
   },
   logo: {

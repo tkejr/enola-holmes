@@ -202,7 +202,7 @@ export default function WelcomeScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <HapticTouchable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color="#007AFF" />
+          <Ionicons name="chevron-back" size={24} color="#000000" />
         </HapticTouchable>
         <Text style={styles.logo}>Enola</Text>
       </View>
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 28,
-    color: '#007AFF',
+    color: '#000000',
     fontWeight: '300',
   },
   logo: {
