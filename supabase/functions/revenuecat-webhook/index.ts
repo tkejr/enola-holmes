@@ -63,12 +63,18 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   )
 
-  const reason = event.type === 'RENEWAL' || productId.startsWith('enola_pro_') ? 'subscription_grant' : 'purchase'
+  // A non-empty `offer_code` means the user redeemed an App Store offer/promo code.
+  // That flag wins over the product type — a code is a code whatever it discounts.
+  // Excludes RENEWAL: RC echoes the original offer_code on paid renewals, but a
+  // renewal is a recurring charge, not a fresh redemption, so it stays `subscription`.
+  const redeemedCode = event.type !== 'RENEWAL' && typeof event.offer_code === 'string' && event.offer_code.trim() !== ''
+  const reason = redeemedCode
+    ? 'coupon_redemption'
+    : event.type === 'RENEWAL' || productId?.startsWith('enola_pro_') ? 'subscription' : 'coin_pack_purchase'
   const { data, error } = await supabase.rpc('add_coins', {
     p_user_id: userId,
     p_amount: amount,
     p_reason: reason,
-    p_source: 'revenuecat',
     p_external_id: externalId,
   })
 

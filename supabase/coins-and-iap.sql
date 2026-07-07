@@ -145,6 +145,11 @@ REVOKE EXECUTE ON FUNCTION public.remove_coins(UUID, INTEGER, TEXT, TEXT, TEXT) 
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 
 -- ==========================================================================
+-- SUPERSEDED: record_search_and_deduct_coin is no longer used or deployed. The live
+-- scan spend runs server-side in the face-search edge function via spend_coin, and
+-- DROP-STALE-TEXT-REASON-OVERLOADS.sql drops this function (it still referenced the
+-- dropped `source` column). Kept here only as history; do not re-run this block.
+--
 -- CONCURRENCY FIX: make the scan-spend atomic.
 -- The scan path (scanning.tsx) calls record_search_and_deduct_coin, whose legacy
 -- definition did SELECT coins -> check -> separate UPDATE (read-then-write). Two

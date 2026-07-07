@@ -37,9 +37,9 @@ async function spendCoin(userJwt: string): Promise<number | null> {
 
 // Refund via add_coins — users are revoked from it, so this uses the service_role key.
 // p_external_id ties the refund to the specific search: add_coins dedupes on
-// (source, external_id), so a retried/duplicated call for the same search can't
-// double-credit. Falls back to no key only if the search never got an id (upload
-// failed before id_search existed) — at most one refund fires per request anyway.
+// external_id, so a retried/duplicated call for the same search can't double-credit.
+// Falls back to no key only if the search never got an id (upload failed before
+// id_search existed) — at most one refund fires per request anyway.
 async function refundCoin(userId: string, idSearch: string | null): Promise<void> {
   await fetch(`${SUPABASE_URL}/rest/v1/rpc/add_coins`, {
     method: 'POST',
@@ -52,7 +52,6 @@ async function refundCoin(userId: string, idSearch: string | null): Promise<void
       p_user_id: userId,
       p_amount: 1,
       p_reason: 'scan_refund',
-      p_source: 'face-search',
       p_external_id: idSearch,
     }),
   }).catch(() => {}) // best-effort; a failed refund must not mask the original error
