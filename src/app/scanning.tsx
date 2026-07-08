@@ -185,7 +185,7 @@ export default function ScanningScreen() {
       setSearchStatus('Search failed');
 
       // Show user-friendly error message
-      const errorMessage = error.message || 'Unable to complete face search. Please try again.';
+      const errorMessage = error.message || 'Unable to complete the search. Please try again.';
 
       Alert.alert(
         'Unable to Search',
