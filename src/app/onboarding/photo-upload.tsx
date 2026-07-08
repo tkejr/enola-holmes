@@ -68,8 +68,8 @@ export default function PhotoUploadScreen() {
       <StaggerIn style={styles.content}>
         <View style={styles.speechBubble}>
           <Text style={styles.speechText}>
-            Upload their photo,{'\n'}
-            <Text style={styles.speechTextAccent}>I'll do the digging</Text>
+            Upload the image,{'\n'}
+            <Text style={styles.speechTextAccent}>I'll find for you</Text>
           </Text>
           <View style={styles.bubbleTail} />
         </View>
@@ -98,7 +98,7 @@ export default function PhotoUploadScreen() {
 
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 8 }}>
           <Ionicons name="lock-closed" size={12} color="#8E8E93" />
-          <Text style={[styles.trustText, { marginTop: 0 }]}>Trusted for dating safety</Text>
+          <Text style={[styles.trustText, { marginTop: 0 }]}>Trusted for image search</Text>
         </View>
       </View>
     </SafeAreaView>

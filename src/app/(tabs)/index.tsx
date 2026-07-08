@@ -116,7 +116,7 @@ export default function HomeScreen() {
         <View style={styles.speechBubble}>
           <Text style={styles.speechText}>
             Upload their photo,{'\n'}
-            <Text style={styles.speechTextAccent}>I'll do the digging</Text>
+            <Text style={styles.speechTextAccent}>I'll find for you</Text>
           </Text>
           <View style={styles.bubbleTail} />
         </View>

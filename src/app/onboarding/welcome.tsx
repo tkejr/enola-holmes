@@ -203,7 +203,7 @@ export default function WelcomeScreen() {
         <Text style={styles.logo}>Enola</Text>
       </View>
 
-      <Pagination step={6} />
+      <Pagination step={5} />
 
       <View style={styles.content}>
         {/* Stars roll in with the referral counter-wheel animation, so they're rendered
@@ -216,7 +216,7 @@ export default function WelcomeScreen() {
 
         <StaggerIn delay={600}>
           <Text style={styles.title}>Join 5,000+ Users</Text>
-          <Text style={styles.subtitle}>Trusted by thousands to find the truth.</Text>
+          <Text style={styles.subtitle}>Trusted by thousands.</Text>
         </StaggerIn>
       </View>
 

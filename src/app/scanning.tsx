@@ -127,7 +127,7 @@ export default function ScanningScreen() {
       // Search runs entirely server-side (Edge Function holds the FaceCheck token and
       // polls for results). We can't get real progress, so creep the bar toward 90%
       // over the expected search time, then snap to 100 on completion.
-      setSearchStatus('Searching faces...');
+      setSearchStatus('Searching image...');
       startRamp();
 
       const result = await searchFace(imageUri);
@@ -136,9 +136,9 @@ export default function ScanningScreen() {
         stopRamp();
         if (result.code === 'IMAGE_ERROR') {
           Alert.alert(
-            'No Face Detected',
-            'Please upload a clear photo with a visible face. Make sure the face is well-lit and not blurry.',
-            [{ text: 'Try Another Photo', onPress: () => router.replace('/(tabs)'), style: 'default' }]
+            'No image Detected',
+            'Please upload a clear photo with a clear surrounding. Make sure the image is not blurry.',
+            [{ text: 'Try Another Image', onPress: () => router.replace('/(tabs)'), style: 'default' }]
           );
           return;
         }
@@ -432,7 +432,7 @@ export default function ScanningScreen() {
           {/* Title Section */}
           <View style={styles.titleSection}>
             <Text style={styles.title}>Analyzing Image</Text>
-            <Text style={styles.subtitle}>Identifying facial features and patterns</Text>
+            <Text style={styles.subtitle}>Identifying the image and patterns in it</Text>
           </View>
 
           {/* Image Container */}

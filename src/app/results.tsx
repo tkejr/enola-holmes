@@ -129,10 +129,6 @@ const ResultCard = ({ result }: { result: CategorizedResult }) => {
           <Text style={styles.matchLabel}>Match Confidence</Text>
         </View>
 
-        {result.username && (
-          <Text style={styles.username}>@{result.username}</Text>
-        )}
-
         <Text
           style={styles.resultUrl}
           numberOfLines={2}
@@ -271,7 +267,7 @@ export default function ResultsScreen() {
               </View>
               <Text style={styles.noResultsTitle}>No Matches Found</Text>
               <Text style={styles.noResultsText}>
-                We couldn't find any matches for this photo. Try with a different image or ensure the face is clear and well-lit.
+                We couldn't find any matches for this photo. Try with a different image or ensure the Image is clear and well-lit.
               </Text>
             </View>
           )}
@@ -530,12 +526,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#8E8E93',
     letterSpacing: -0.2,
-  },
-  username: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000000',
-    letterSpacing: -0.3,
   },
   resultUrl: {
     fontSize: 13,

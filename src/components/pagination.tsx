@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 // Onboarding progress dots. `step` is 1-based; a single source of truth for TOTAL means
 // removing/adding a screen no longer leaves the counts out of sync across every file.
-export const ONBOARDING_TOTAL = 6;
+export const ONBOARDING_TOTAL = 5;
 
 export function Pagination({ step, total = ONBOARDING_TOTAL }: { step: number; total?: number }) {
   return (

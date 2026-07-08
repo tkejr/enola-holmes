@@ -256,7 +256,7 @@ export default function CropScreen() {
           <Ionicons name="close" size={24} color="#1C1C1E" />
         </HapticTouchable>
         <View style={styles.headerCenter}>
-          <Text style={styles.title}>Position the face</Text>
+          <Text style={styles.title}>Position the Image</Text>
           <Text style={styles.subtitle}>pinch to zoom · drag to move</Text>
         </View>
         <HapticTouchable
