@@ -5,6 +5,5 @@
 // AsyncStorage if onboarding ever needs to survive an app restart.
 export const onboardingAnswers: {
   howFound?: string;
-  searchTargets?: string[];
   beneficialResults?: string[];
 } = {};

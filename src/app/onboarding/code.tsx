@@ -116,7 +116,7 @@ export default function CodeScreen() {
         <Text style={styles.logo}>Enola</Text>
       </View>
 
-      <Pagination step={6} />
+      <Pagination step={5} />
 
       {/* No KeyboardAvoidingView: lifting the footer made Redeem/Skip overlap the code
           boxes. Instead the footer is hidden while typing and a down-chevron closes the

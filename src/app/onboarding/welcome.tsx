@@ -203,7 +203,7 @@ export default function WelcomeScreen() {
         <Text style={styles.logo}>Enola</Text>
       </View>
 
-      <Pagination step={7} />
+      <Pagination step={6} />
 
       <View style={styles.content}>
         {/* Stars roll in with the referral counter-wheel animation, so they're rendered

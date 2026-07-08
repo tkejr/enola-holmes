@@ -29,7 +29,7 @@ export default function HowFoundScreen() {
 
   const goNext = () => {
     onboardingAnswers.howFound = selected ?? undefined;
-    router.push('/onboarding/search-target');
+    router.push('/onboarding/preferences');
   };
 
   return (

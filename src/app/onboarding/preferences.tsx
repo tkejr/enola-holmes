@@ -54,7 +54,7 @@ export default function PreferencesScreen() {
         <Text style={styles.logo}>Enola</Text>
       </View>
 
-      <Pagination step={5} />
+      <Pagination step={4} />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <StaggerIn>
