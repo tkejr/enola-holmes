@@ -7,6 +7,7 @@ import { setOnboardingCompleted } from '../../utils/storage';
 import { onboardingAnswers } from '../../utils/onboardingAnswers';
 import { supabase } from '../../utils/supabase';
 import { identify } from '../../utils/identity';
+import { saveAnonCredentials, getDeviceId } from '../../utils/anonAuth';
 import { usePostHog } from 'posthog-react-native';
 import { StaggerIn } from '../../components/stagger-in';
 import { Pagination } from '../../components/pagination';
@@ -144,18 +145,27 @@ export default function WelcomeScreen() {
 
       console.log('User account created:', userId);
 
+      // Persist the anonymous credentials to the iOS Keychain, which survives an app
+      // uninstall (AsyncStorage does not). This is the only way back into this account
+      // after a reinstall — without it, coins/history/subscription orphan on a dead uid.
+      await saveAnonCredentials(tempEmail, tempPassword);
+
       // Tie this Supabase user to RevenueCat/PostHog/Sentry BEFORE they can reach
       // the paywall or hit an error. Without RC identify, a first purchase maps to
       // RC's anonymous id and the webhook credits coins to nobody; without Sentry
       // setUser, an onboarding error would report as <anonymous>.
       await identify(userId, posthog);
 
-      // Create profile using RPC function
+      // Create profile using RPC function. p_device_id anchors the free-coin/referral
+      // guard to this physical device (Keychain-backed, survives uninstall), so a
+      // delete-and-recreate on the same device can't re-farm the free signup coin.
+      const deviceId = await getDeviceId();
       const { data: profileResult, error: profileError } = await supabase
         .rpc('create_user_profile', {
           user_id: userId,
           user_email: tempEmail,
-          referral_code_used: code || null
+          referral_code_used: code || null,
+          p_device_id: deviceId
         });
 
       if (profileError) {

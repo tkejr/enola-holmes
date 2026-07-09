@@ -4,6 +4,7 @@ import { HapticTouchable } from '@/components/haptic-touchable';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/utils/supabase';
+import { clearAnonCredentials } from '@/utils/anonAuth';
 import * as Clipboard from 'expo-clipboard';
 import * as StoreReview from 'expo-store-review';
 import { LEGAL_URLS } from '@/components/subscription-disclosure';
@@ -108,6 +109,9 @@ export default function SettingsScreen() {
                 },
               });
               if (!res.ok) throw new Error(String(res.status));
+              // Wipe the Keychain credentials so the deleted account can't be
+              // resurrected by restoreAnonSession() on the next launch.
+              await clearAnonCredentials();
               await supabase.auth.signOut();
               // Clear both analytics + crash identities so the deleted user isn't
               // linked to whoever signs up next on this device.

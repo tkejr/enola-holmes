@@ -6,6 +6,9 @@ import Reanimated, { FadeIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { hasCompletedOnboarding, resetOnboarding } from '../utils/storage';
 import { supabase } from '../utils/supabase';
+import { restoreAnonSession } from '../utils/anonAuth';
+import { identify } from '../utils/identity';
+import { usePostHog } from 'posthog-react-native';
 
 // Mascot + glass geometry. `enola-glass-full.png` (87x190) is a pixel crop of
 // `enola-body.png` at source (619, 207) with the finger-covered part of the bar synthesized,
@@ -25,6 +28,7 @@ const HAND_TOP = 307 * S; // fingertip line: the flying glass is clipped below i
 const FLY_SPACE = 130;    // base px of headroom above the mascot box for the airborne glass
 
 export default function HomeScreen() {
+  const posthog = usePostHog();
   const { width, height } = useWindowDimensions();
   // Scale the whole mascot rig to the device: fill ~62% of width, but never dwarf a short
   // screen or balloon on a tablet. Everything mascot-relative (glass, fist) derives from `k`,
@@ -93,8 +97,20 @@ export default function HomeScreen() {
           setIsLoading(false);
         }
       } else {
-        // No session -> show welcome screen
-        setIsLoading(false);
+        // No session — but AsyncStorage is wiped on uninstall, so this may be a reinstall
+        // of an existing anonymous account. Try restoring it from the iOS Keychain before
+        // showing the welcome screen; on success the user's uid (coins/history/subscription)
+        // comes back instead of a fresh account.
+        const restoredId = await restoreAnonSession();
+        if (restoredId) {
+          console.log('Anon session restored from Keychain:', restoredId);
+          await identify(restoredId, posthog);
+          const completed = await hasCompletedOnboarding();
+          router.replace(completed ? '/(tabs)' : '/onboarding/welcome');
+        } else {
+          // Genuinely new user -> show welcome screen
+          setIsLoading(false);
+        }
       }
     } catch (error) {
       console.error('Error checking auth:', error);
