@@ -1,9 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { View, ActivityIndicator } from 'react-native';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PurchasesOffering } from 'react-native-purchases';
 import RevenueCatUI from 'react-native-purchases-ui';
-import { getSubscriptionOfferings } from '@/utils/revenuecat';
+import { getSubscriptionOfferings, hasProEntitlementSynced } from '@/utils/revenuecat';
 
 // Renders the RevenueCat-hosted Paywall template for the `default` offering instead of
 // hand-coded cards. Design/prices live in the RC dashboard.
@@ -14,12 +14,25 @@ export default function PaywallScreen() {
   const [offering, setOffering] = useState<PurchasesOffering | null | 'loading'>('loading');
 
   // All routes into welcome carry the referral code so it survives to profile creation.
-  const goToWelcome = () =>
-    router.push({ pathname: '/onboarding/welcome', params: code ? { code } : {} });
+  // RC's paywall fires onPurchaseCompleted AND onDismiss when the sheet closes, so guard
+  // against a double navigation. replace (not push) so back-swipe can't re-enter the paywall.
+  const advanced = useRef(false);
+  const goToWelcome = () => {
+    if (advanced.current) return;
+    advanced.current = true;
+    router.replace({ pathname: '/onboarding/welcome', params: code ? { code } : {} });
+  };
 
   useEffect(() => {
     let alive = true;
-    getSubscriptionOfferings().then((o) => alive && setOffering(o));
+    // Already subscribed (e.g. reinstall with a live App Store sub, which RC surfaces via
+    // the synced receipt even while still anonymous) — don't show a buy-again paywall.
+    // Skip straight into the app; the webhook credits any owed coins on the logIn TRANSFER.
+    hasProEntitlementSynced().then((isPro) => {
+      if (!alive) return;
+      if (isPro) goToWelcome();
+      else getSubscriptionOfferings().then((o) => alive && setOffering(o));
+    });
     return () => { alive = false; };
   }, []);
 
