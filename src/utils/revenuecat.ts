@@ -2,12 +2,6 @@ import Purchases, { CustomerInfo, PurchasesOffering, PurchasesPackage } from 're
 
 export const ENTITLEMENT_ID = 'pro';
 
-export const PRODUCT_IDS = {
-  MONTHLY: 'monthly',
-  YEARLY: 'yearly',
-  CONSUMABLE: 'consumable',
-};
-
 export const OFFERING_ID = 'default';
 export const COIN_OFFERING_ID = 'coins';
 
@@ -75,6 +69,23 @@ export const hasProEntitlement = async (): Promise<boolean> => {
   }
 };
 
+// Reliable Pro check for the buy-again GATES (onboarding paywall). On a fresh reinstall
+// the SDK's first getCustomerInfo can return before StoreKit has re-synced the Apple
+// receipt, so a live subscriber briefly reads as NOT Pro and gets shown a buy-again
+// paywall. If the first read says not-Pro, force a restore (re-attaches the receipt) and
+// re-check. A true non-subscriber just pays one extra round-trip and still sees the paywall.
+// No password prompt on iOS for a silent restore of an existing receipt.
+export const hasProEntitlementSynced = async (): Promise<boolean> => {
+  if (await hasProEntitlement()) return true;
+  try {
+    const info = await Purchases.restorePurchases();
+    return typeof info.entitlements.active[ENTITLEMENT_ID] !== 'undefined';
+  } catch (error) {
+    console.error('❌ Error syncing entitlement:', error);
+    return false; // fail open to the paywall — never trap a real non-subscriber
+  }
+};
+
 export const getOfferings = async (): Promise<PurchasesOffering | null> => {
   try {
     const offerings = await Purchases.getOfferings();
@@ -102,6 +113,17 @@ export const purchasePackage = async (pkg: PurchasesPackage): Promise<{ customer
       console.log('🚫 User cancelled purchase');
     }
     return null;
+  }
+};
+
+// Opens Apple's native offer-code redemption sheet (iOS only). After the user
+// redeems, RevenueCat fires the purchase webhook, which credits coins server-side
+// exactly like a normal purchase — nothing to do app-side beyond opening the sheet.
+export const redeemCode = async (): Promise<void> => {
+  try {
+    await Purchases.presentCodeRedemptionSheet();
+  } catch (error) {
+    console.error('❌ Error presenting code redemption sheet:', error);
   }
 };
 

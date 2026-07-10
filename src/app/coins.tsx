@@ -6,7 +6,9 @@ import { useProfile } from "@/utils/useRealtime";
 import {
   getCoinOfferings,
   getSubscriptionOfferings,
+  hasProEntitlement,
   purchasePackage,
+  redeemCode,
 } from "@/utils/revenuecat";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -98,12 +100,17 @@ export default function CoinsScreen() {
   const purchaseCoins = async (pkg: PurchasesPackage) => {
     setBuyingId(pkg.identifier);
     try {
+      // Snapshot the balance BEFORE the purchase. Coin packs credit fast, and if we
+      // read the baseline after purchasePackage resolves the webhook may have already
+      // landed — then `latest > baseline` is never true and we'd wrongly report "not
+      // credited" while the badge already shows the higher number.
+      const baseline = await getCoins();
+
       const result = await purchasePackage(pkg);
       if (!result) return; // cancelled or failed (util already logged)
 
       // Coins are credited server-side by the RevenueCat webhook. Poll the balance
-      // until it rises above a FRESH baseline (not stale React state) or we time out.
-      const baseline = await getCoins();
+      // until it rises above the pre-purchase baseline or we time out.
       let latest = baseline;
       let credited = false;
       for (let i = 0; i < 8; i++) {
@@ -135,6 +142,15 @@ export default function CoinsScreen() {
 
   // Presents the RC-hosted Paywall template for the `default` (subscription) offering.
   const showSubscriptionPaywall = async () => {
+    // Already subscribed? Don't let them buy a second plan. The `pro` entitlement is the
+    // source of truth (survives reinstall via RC restore), so gate on it, not on coins.
+    if (await hasProEntitlement()) {
+      Alert.alert(
+        "You're subscribed",
+        "You already have Enola Pro. Manage or change your plan in the App Store.",
+      );
+      return;
+    }
     const offering = await getSubscriptionOfferings();
     if (!offering) {
       Alert.alert(
@@ -288,6 +304,10 @@ export default function CoinsScreen() {
                 <Text style={styles.inviteButtonText}>
                   Invite Friends & Earn Free Coins
                 </Text>
+              </HapticTouchable>
+
+              <HapticTouchable style={styles.redeemButton} onPress={redeemCode}>
+                <Text style={styles.redeemButtonText}>Have a code? Redeem it</Text>
               </HapticTouchable>
             </>
           ) : (
@@ -509,6 +529,17 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#1C1C1E",
     letterSpacing: -0.3,
+  },
+  redeemButton: {
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  redeemButtonText: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#8E8E93",
+    letterSpacing: -0.2,
   },
   // Subscription tab
   subList: {
